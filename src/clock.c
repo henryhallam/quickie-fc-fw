@@ -69,5 +69,5 @@ void clock_setup(void)
 	systick_counter_enable();
 
 	/* this done last */
-        //	systick_interrupt_enable();
+        	systick_interrupt_enable();
 }
