@@ -17,9 +17,9 @@
 ## along with this library.  If not, see <http://www.gnu.org/licenses/>.
 ##
 
-BINARY = 1bitsy-example
+BINARY = quickie-fc
 
-OBJS = main.o
+OBJS = main.o board.o clock.o lcd.o leds.o
 
 LDSCRIPT = ../1bitsy-stm32f415rgt.ld
 

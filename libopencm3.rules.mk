@@ -39,6 +39,7 @@ OBJCOPY		:= $(PREFIX)-objcopy
 OBJDUMP		:= $(PREFIX)-objdump
 GDB		:= $(PREFIX)-gdb
 STFLASH		= $(shell which st-flash)
+DFUUTIL		:= $(shell which dfu-util)
 STYLECHECK	:= /checkpatch.pl
 STYLECHECKFLAGS	:= --no-tree -f --terse --mailback
 STYLECHECKFILES	:= $(shell find . -name '*.[ch]')
@@ -134,6 +135,7 @@ list: $(BINARY).list
 images: $(BINARY).images
 flash: $(BINARY).flash
 stlink-flash: $(BINARY).stlink-flash
+dfu-flash: $(BINARY).dfu-flash
 
 %.images: %.bin %.hex %.srec %.list %.map
 	@printf "*** $* images generated ***\n"
@@ -234,6 +236,11 @@ endif
 	           -ex 'target extended-remote $(BMP_PORT)' \
 	           -x $(SCRIPT_DIR)/black_magic_probe_flash.scr \
 	           $(*).elf
+
+%.dfu-flash: %.bin
+	@printf " FLASH $<\n"
+	$(Q)$(DFUUTIL) -a 0 -i 0 -s 0x08000000:leave -D $(*).bin
+
 
 .PHONY: images clean stylecheck styleclean elf bin hex srec list
 
