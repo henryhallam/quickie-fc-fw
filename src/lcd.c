@@ -2,6 +2,7 @@
 #include "clock.h"
 #include <libopencm3/stm32/spi.h>
 #include <libopencm3/stm32/gpio.h>
+#include <stdlib.h>
 
 #define ASSERT_LCD_CS gpio_clear(GPIOB, GPIO12)
 #define RELEASE_LCD_CS gpio_set(GPIOB, GPIO12)
@@ -14,8 +15,8 @@
 #define HX8357D 0xD
 #define HX8357B 0xB
 
-#define HX8357_TFTWIDTH  320
-#define HX8357_TFTHEIGHT 480
+#define HX8357_TFTWIDTH  480
+#define HX8357_TFTHEIGHT 320
 
 #define HX8357_NOP     0x00
 #define HX8357_SWRESET 0x01
@@ -84,6 +85,14 @@
 #define HX8357B_SETGAMMA 0xC8
 #define HX8357B_SETPANELRELATED  0xE9
 
+#define MADCTL_MY  0x80
+#define MADCTL_MX  0x40
+#define MADCTL_MV  0x20
+#define MADCTL_ML  0x10
+#define MADCTL_RGB 0x00
+#define MADCTL_BGR 0x08
+#define MADCTL_MH  0x04
+
 // Color definitions
 #define	HX8357_BLACK   0x0000
 #define	HX8357_BLUE    0x001F
@@ -140,17 +149,38 @@ lcd_command(uint8_t cmd, int delay, int n_args, const uint8_t *args)
 
 static void writecommand(uint8_t cmd) {
   ASSERT_LCD_CS;
+  usleep(1);
   (void) spi_xfer(LCD_SPI, cmd);
+  usleep(1);
   RELEASE_LCD_CS;
 }
 
 static void writedata(uint8_t data) {
   ASSERT_LCD_DATA;
   ASSERT_LCD_CS;
+  usleep(1);
   (void) spi_xfer(LCD_SPI, data);
+  usleep(1);
   RELEASE_LCD_CS;
   RELEASE_LCD_DATA;
 }
+
+static uint8_t readcommand8(uint8_t cmd) {
+  ASSERT_LCD_CS;
+  
+  usleep(1);
+  (void) spi_xfer(LCD_SPI, cmd);
+  usleep(1);
+ 
+  ASSERT_LCD_DATA;
+  usleep(1);
+  uint8_t r = spi_xfer(LCD_SPI, 0);
+  RELEASE_LCD_DATA;
+  RELEASE_LCD_CS;
+  usleep(1);
+  return r;
+}
+
 
 static void lcd_init_seq(void) {
   writecommand(HX8357_SWRESET);
@@ -243,9 +273,10 @@ static void lcd_init_seq(void) {
     
   writecommand(HX8357_COLMOD);
   writedata(0x55);  // 16 bit
-    
+
+  // Set up for appropriate landscape orientation
   writecommand(HX8357_MADCTL);  
-  writedata(0xC0); 
+  writedata(MADCTL_MX | MADCTL_MV | MADCTL_RGB);
     
   writecommand(HX8357_TEON);  // TE off
   writedata(0x00); 
@@ -261,6 +292,49 @@ static void lcd_init_seq(void) {
   msleep(50);
 }
 
+void lcd_set_window(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1) {
+
+  writecommand(HX8357_CASET); // Column addr set
+  writedata(x0 >> 8);
+  writedata(x0 & 0xFF);     // XSTART 
+  writedata(x1 >> 8);
+  writedata(x1 & 0xFF);     // XEND
+
+  writecommand(HX8357_PASET); // Row addr set
+  writedata(y0>>8);
+  writedata(y0);     // YSTART
+  writedata(y1>>8);
+  writedata(y1);     // YEND
+
+  writecommand(HX8357_RAMWR); // write to RAM
+}
+
+void lcd_fill_rect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) {
+
+  // rudimentary clipping (drawChar w/big text requires this)
+  if((x >= HX8357_TFTWIDTH) || (y >= HX8357_TFTHEIGHT)) return;
+  if((x + w - 1) >= HX8357_TFTWIDTH)  w = HX8357_TFTWIDTH  - x;
+  if((y + h - 1) >= HX8357_TFTHEIGHT) h = HX8357_TFTHEIGHT - y;
+
+  lcd_set_window(x, y, x+w-1, y+h-1);
+
+  uint8_t hi = color >> 8, lo = color;
+
+  ASSERT_LCD_DATA;
+  ASSERT_LCD_CS;
+  usleep(1);
+
+  for(y=h; y>0; y--) {
+    for(x=w; x>0; x--) {
+      (void) spi_xfer(LCD_SPI, hi);
+      (void) spi_xfer(LCD_SPI, lo);
+    }
+  }
+
+  RELEASE_LCD_DATA;
+  RELEASE_LCD_CS;
+}
+
 void lcd_setup(void) {
   lcd_backlight_set(1);
 
@@ -273,12 +347,32 @@ void lcd_setup(void) {
   msleep(150);
 
   lcd_init_seq();
+
+  lcd_fill_rect(22, 22, 222, 422, HX8357_BLUE);
 }
 
 void lcd_demo(void) {
-  static int i = 0;
-  writecommand(i ? HX8357_INVON : HX8357_INVOFF);
-  i = !i;
+  /*
+  // read diagnostics (optional but can help debug problems)
+  volatile uint8_t x = readcommand8(HX8357_RDPOWMODE);
+  x = readcommand8(HX8357_RDMADCTL);
+  x = readcommand8(HX8357_RDCOLMOD);
+  x = readcommand8(HX8357_RDDIM);
+  x = readcommand8(HX8357_RDDSDR);
+  */
+  uint16_t x, y, w, h, c;
+  x = rand();
+  y = rand();
+  x %= HX8357_TFTWIDTH;
+  y %= HX8357_TFTHEIGHT;
+  w = rand();
+  h = rand();
+  w %= HX8357_TFTWIDTH - x;
+  h %= HX8357_TFTHEIGHT - y;
+
+  c = rand();
+
+  lcd_fill_rect(x, y, w, h, c);
 }
 
 void lcd_backlight_set(int level) {

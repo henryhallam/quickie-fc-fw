@@ -10,6 +10,7 @@
  * Definitions for functions being abstracted out
  */
 void msleep(uint32_t);
+void usleep(uint32_t);
 uint32_t mtime(void);
 void clock_setup(void);
 

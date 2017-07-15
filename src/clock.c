@@ -29,6 +29,10 @@
 /* Common function descriptions */
 #include "clock.h"
 
+static const int sysclock_hz = 168000000;
+static const int sysclock_mhz = 168;
+static const uint32_t systick_reload = 168000;  // To get 1 kHz systick interrupt rate
+
 /* milliseconds since boot */
 static volatile uint32_t system_millis;
 
@@ -36,6 +40,15 @@ static volatile uint32_t system_millis;
 void sys_tick_handler(void)
 {
 	system_millis++;
+}
+
+/* simple sleep for delay microseconds (must be less than systick period) */
+void usleep(uint32_t delay)
+{
+  int32_t wake = systick_get_value() - delay * sysclock_mhz + 80;
+  if (wake <= 0)
+    wake += systick_reload;
+  while ((systick_get_value() - (uint32_t)wake) < systick_reload);
 }
 
 /* simple sleep for delay milliseconds */
@@ -63,11 +76,10 @@ void clock_setup(void)
 	/* Base board frequency, set to 168Mhz */
 	rcc_clock_setup_hse_3v3(&rcc_hse_25mhz_3v3[RCC_CLOCK_3V3_168MHZ]);
         
-	/* clock rate / 168000 to get 1mS interrupt rate */
-	systick_set_reload(168000);
+	systick_set_reload(systick_reload);
 	systick_set_clocksource(STK_CSR_CLKSOURCE_AHB);
 	systick_counter_enable();
 
 	/* this done last */
-        	systick_interrupt_enable();
+        systick_interrupt_enable();
 }
