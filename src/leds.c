@@ -4,7 +4,7 @@
 #include "leds.h"
 
 #define PERIOD 65535
-#define DUTY_YELLOW 0.90  // The red is a lot brighter so we have to bias heavily toward green
+#define DUTY_YELLOW 0.91  // The red is a lot brighter so we have to bias heavily toward green
 void leds_setup(void)
 {
   /* Timer 8 for LEDs */
