@@ -17,7 +17,7 @@ int gui_mc_init(gui_mc *handle, int x, int y) {
 }
 
 void gui_mc_update(gui_mc *handle, const mc_gui_data_t *data) {
-  const char *motor_state_names[] = {"Init", "Fault", "Disable", "Ready", "Soft", "SoftI", "FlySt", "Torque", "Offset", "Speed"};
+  const char *motor_state_names[] = {"Init", "Fault", "Disable", "Ready", "Soft", "SoftIrq", "FlyStrt", "Torque", "Offset", "Speed"};
 
   if (data == NULL)
     return;

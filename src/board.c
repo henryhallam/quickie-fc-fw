@@ -5,6 +5,7 @@
 #include "board.h"
 #include "clock.h"
 #include "lcd.h"
+#include "touch.h"
 #include "leds.h"
 
 static void pins_setup(void)
@@ -92,4 +93,5 @@ void board_setup(void) {
   spi_setup();
   leds_setup();
   lcd_setup();
+  touch_setup();
 }

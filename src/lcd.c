@@ -308,9 +308,9 @@ void lcd_backlight_set(int level) {
 uint16_t *lcd_fb_prep(int x, int y, int w, int h, uint16_t bg) {
   if (w * h > FB_MAX_PIXELS)
     return NULL;
-  if (fb_x < 0 || fb_y < 0)
+  if (x < 0 || y < 0)
     return NULL;
-  if (fb_x + fb_w > LCD_W || fb_y + fb_h > LCD_H)
+  if (x + w > LCD_W || y + h > LCD_H)
     return NULL;
   fb_x = x;
   fb_y = y;

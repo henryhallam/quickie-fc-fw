@@ -52,7 +52,7 @@ typedef struct {
   int y;
 } gui_mc;
 
-#define GUI_MC_W 140
+#define GUI_MC_W 134
 #define GUI_MC_H 210
 
 int gui_mc_init(gui_mc *handle, int x, int y);
