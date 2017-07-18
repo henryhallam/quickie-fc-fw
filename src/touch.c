@@ -152,10 +152,8 @@ int touch_get(int *x, int *y) {
 
 // Return 0 on success, -1 on timeout or parameter error.
 static int touch_cal_point(int16_t tgt_x, int16_t tgt_y, int16_t raw_xyz[3]) {
-  if (lcd_fb_prep(tgt_x - 3, tgt_y - 3, 7, 7, LCD_PURPLE))
-    lcd_fb_show();
-  else
-    return -1;
+
+  lcd_fill_rect(tgt_x - 3, tgt_y - 3, 7, 7, LCD_PURPLE);
   
   uint32_t t_start = mtime();
   int pressed = 0, count = 0, done = 0;
@@ -184,13 +182,11 @@ static int touch_cal_point(int16_t tgt_x, int16_t tgt_y, int16_t raw_xyz[3]) {
         raw_xyz[1] = y_raw;
         raw_xyz[2] = z_raw;
         // ack to the user
-        lcd_fb_prep(tgt_x - 40, tgt_y - 40, 81, 81, LCD_YELLOW);
-        lcd_fb_show();
+        lcd_fill_rect(tgt_x - 40, tgt_y - 40, 81, 81, LCD_YELLOW);
         done = 1;
       } else {
         if (done) {
-          lcd_fb_prep(tgt_x - 40, tgt_y - 40, 81, 81, LCD_BLACK);
-          lcd_fb_show();
+          lcd_fill_rect(tgt_x - 40, tgt_y - 40, 81, 81, LCD_BLACK);
           return 0;
         }
       }
