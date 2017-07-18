@@ -78,18 +78,16 @@ static int fb_x = 0, fb_y = 0, fb_w = 0, fb_h = 0;
 
 static void writecommand(uint8_t cmd) {
   ASSERT_LCD_CS;
-  usleep(1);
   (void) spi_xfer(LCD_SPI, cmd);
-  usleep(1);
+  while (SPI2_SR & SPI_SR_BSY);  // DMA done doesn't mean it's safe to release CS
   RELEASE_LCD_CS;
 }
 
 static void writedata(uint8_t data) {
   ASSERT_LCD_DATA;
   ASSERT_LCD_CS;
-  usleep(1);
   (void) spi_xfer(LCD_SPI, data);
-  usleep(1);
+  while (SPI2_SR & SPI_SR_BSY);  // DMA done doesn't mean it's safe to release CS
   RELEASE_LCD_CS;
   RELEASE_LCD_DATA;
 }
@@ -223,36 +221,9 @@ static void lcd_set_window(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1) {
   writecommand(HX8357_RAMWR); // write to RAM
 }
 
-void lcd_fill_rect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) {
-
-  // rudimentary clipping (drawChar w/big text requires this)
-  if((x >= HX8357_TFTWIDTH) || (y >= HX8357_TFTHEIGHT)) return;
-  if((x + w - 1) >= HX8357_TFTWIDTH)  w = HX8357_TFTWIDTH  - x;
-  if((y + h - 1) >= HX8357_TFTHEIGHT) h = HX8357_TFTHEIGHT - y;
-
-  lcd_set_window(x, y, x+w-1, y+h-1);
-
-  uint8_t hi = color >> 8, lo = color;
-
-  ASSERT_LCD_DATA;
-  ASSERT_LCD_CS;
-  //  usleep(1);
-
-  for(y=h; y>0; y--) {
-    for(x=w; x>0; x--) {
-      (void) spi_xfer(LCD_SPI, hi);
-      (void) spi_xfer(LCD_SPI, lo);
-    }
-  }
-
-  RELEASE_LCD_DATA;
-  RELEASE_LCD_CS;
-}
-
 void lcd_clear(void) {
   lcd_fill_rect(0, 0, LCD_W, LCD_H, LCD_BLACK);
 }
-
 
 static void lcd_dma_setup(void)
 {
@@ -296,23 +267,50 @@ void lcd_setup(void) {
   lcd_backlight_set(1);
 }
 
-void lcd_blit(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t *data) {
+static void lcd_blit_dma(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t *data, int onecolor) {
   lcd_set_window(x, y, x+w-1, y+h-1);
   ASSERT_LCD_DATA;
   ASSERT_LCD_CS;
-  uint32_t n = w * h;
-  dma_set_memory_address(DMA1, DMA_STREAM4, (uint32_t) data);
-  dma_set_number_of_data(DMA1, DMA_STREAM4, n);
-  dma_enable_stream(DMA1, DMA_STREAM4);
-  dma_done = 0;
+  size_t n = w * h;
+
+  if (onecolor)
+    dma_disable_memory_increment_mode(DMA1, DMA_STREAM4);
+  else
+    dma_enable_memory_increment_mode(DMA1, DMA_STREAM4);
   spi_set_dff_16bit(LCD_SPI);
-  spi_enable_tx_dma(LCD_SPI);
-  while (!dma_done);  // TODO: Async
+  // DMA can only transfer up to 65535 words at a time
+  do {
+    uint16_t n_seg = (n > 65535) ? 65535 : n;
+    dma_set_memory_address(DMA1, DMA_STREAM4, (uint32_t) data);
+    dma_set_number_of_data(DMA1, DMA_STREAM4, n_seg);
+    dma_done = 0;
+    dma_enable_stream(DMA1, DMA_STREAM4);
+    spi_enable_tx_dma(LCD_SPI);
+    while (!dma_done);  // TODO: Async
+    spi_disable_tx_dma(LCD_SPI);
+    if (!onecolor)
+      data += n_seg;
+    n -= n_seg;
+  } while (n > 0);
   while (SPI2_SR & SPI_SR_BSY);  // DMA done doesn't mean it's safe to release CS
-  spi_disable_tx_dma(LCD_SPI);
   spi_set_dff_8bit(LCD_SPI);
   RELEASE_LCD_DATA;
   RELEASE_LCD_CS;
+}
+
+void lcd_blit(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t *data) {
+  lcd_blit_dma(x, y, w, h, data, 0);
+}
+
+void lcd_fill_rect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) {
+
+  // rudimentary clipping
+  /*
+  if((x >= HX8357_TFTWIDTH) || (y >= HX8357_TFTHEIGHT)) return;
+  if((x + w - 1) >= HX8357_TFTWIDTH)  w = HX8357_TFTWIDTH  - x;
+  if((y + h - 1) >= HX8357_TFTHEIGHT) h = HX8357_TFTHEIGHT - y;
+  */
+  lcd_blit_dma(x, y, w, h, &color, 1);
 }
 
 void lcd_demo(void) {
