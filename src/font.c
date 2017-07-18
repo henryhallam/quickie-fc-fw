@@ -11,6 +11,7 @@ static int cursor_x = 0, cursor_y = 0;
 #include "Fonts/FreeSans12pt7b.h"
 #include "Fonts/FreeSans9pt7b.h"
 #include "Fonts/FreeSansBold9pt7b.h"
+#include "Fonts/FreeSansBold12pt7b.h"
 #include "Fonts/FreeSansOblique9pt7b.h"
 #include "Fonts/FreeMono9pt7b.h"
 #include "Fonts/FreeMono12pt7b.h"

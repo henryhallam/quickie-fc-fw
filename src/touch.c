@@ -11,8 +11,6 @@
 /*
   PC13      = Y-   PC0/ADC10 = X+
   PC4/ADC14 = Y+   PC5/ADC15 = X-
-
-      
 */
 
 #define TOUCH_ADC ADC1
@@ -28,7 +26,7 @@
 #define ADC_CH_YP 14
 
 #define NOISE_BOUNCE_THRES 64
-#define CAL_TIMEOUT 12000
+#define CAL_TIMEOUT 8000
 #define CAL_EDGE_DIST 50
 
 struct cal_params {
@@ -39,9 +37,15 @@ struct cal_params {
   int16_t y_offset;
 };
 
-static struct cal_params cal = {.z_thres = 2000,
-                                .x_scale = LCD_W, .x_offset = 0,
-                                .y_scale = -LCD_H, .y_offset = LCD_H};
+#define X_SCALE_DEF (1.182 * LCD_W)
+#define X_OFFSET_DEF (-55)
+#define Y_SCALE_DEF (-1.275 * LCD_H)
+#define Y_OFFSET_DEF (LCD_H + 45)
+#define Z_THRES_DEF 944
+
+static struct cal_params cal = {.z_thres = Z_THRES_DEF,
+                                .x_scale = X_SCALE_DEF, .x_offset = X_OFFSET_DEF,
+                                .y_scale = Y_SCALE_DEF, .y_offset = Y_OFFSET_DEF};
 
 void touch_setup(void) {
   rcc_periph_clock_enable(TOUCH_RCC_ADC);
@@ -68,7 +72,7 @@ static int16_t adc_read(uint8_t channel) {
   return (result[0] + result[1]) / 2;
 }
 
-static int touch_get_raw(int *x, int *y) {
+static int16_t touch_get_raw(int16_t *x, int16_t *y) {
   /*
     1. Find X coordinate:
        Set X- low, X+ high and Y- high-impedance.
@@ -123,7 +127,7 @@ static int touch_get_raw(int *x, int *y) {
 
 
 int touch_get(int *x, int *y) {
-  int x_raw, y_raw, z_raw;
+  int16_t x_raw, y_raw, z_raw;
   z_raw = touch_get_raw(&x_raw, &y_raw);
   if (z_raw < cal.z_thres) // includes noise error cases when touch_get_raw returns -1
     return 0;  // no touch
@@ -132,6 +136,16 @@ int touch_get(int *x, int *y) {
     *x = ((x_raw * cal.x_scale) >> 12) + cal.x_offset;
     *y = ((y_raw * cal.y_scale) >> 12) + cal.y_offset;
   }
+
+  // Clip to screen borders, just in case
+  if (*x < 0)
+    *x = 0;
+  else if (*x >= LCD_W)
+    *x = LCD_W - 1;
+  if (*y < 0)
+    *y = 0;
+  else if (*y >= LCD_H)
+    *y = LCD_H - 1;
   return 1;
 }
 
@@ -146,7 +160,7 @@ static int touch_cal_point(int16_t tgt_x, int16_t tgt_y, int16_t raw_xyz[3]) {
   uint32_t t_start = mtime();
   int pressed = 0, count = 0, done = 0;
   while (mtime() - t_start < CAL_TIMEOUT) {
-    int x_raw, y_raw, z_raw;
+    int16_t x_raw, y_raw, z_raw;
     z_raw = touch_get_raw(&x_raw, &y_raw);
     if (z_raw >= cal.z_thres) { // excludes noise error cases when touch_get_raw returns -1
       if (!pressed) {
@@ -188,11 +202,16 @@ static int touch_cal_point(int16_t tgt_x, int16_t tgt_y, int16_t raw_xyz[3]) {
 
 int touch_cal(void) {
   lcd_clear();
-  lcd_textbox_prep(LCD_W / 2 - 180, LCD_H / 2 - 40, 360, 30, LCD_BLACK);
-  lcd_printf(LCD_WHITE, &FreeSans12pt7b, "Please touch the indicated points.");
+  lcd_textbox_prep(LCD_W / 2 - 180, 90, 360, 50, LCD_BLACK);
+  lcd_printf(LCD_WHITE, &FreeSans12pt7b, "Please touch the indicated points,\n");
+  lcd_textbox_move_cursor(30, 0, 1);
+  lcd_printf(LCD_WHITE, &FreeSans12pt7b, "or wait to cancel calibration.");
   lcd_textbox_show();
 
-  cal.z_thres = 1000;
+  // Choose a conservatively low pressure threshold for the calibration
+  cal.z_thres = 500;
+
+  // Display 5 target points
   const int16_t tgt_xy[5][2] = {{CAL_EDGE_DIST, CAL_EDGE_DIST},
                                 {LCD_W - CAL_EDGE_DIST, CAL_EDGE_DIST},
                                 {LCD_W - CAL_EDGE_DIST, LCD_H - CAL_EDGE_DIST},
@@ -203,33 +222,69 @@ int touch_cal(void) {
   for (int i = 0; i < 5; i++) {
     if (touch_cal_point(tgt_xy[i][0], tgt_xy[i][1], raw_xyz[i]) != 0) {
       lcd_clear();
+      cal.z_thres = Z_THRES_DEF;
       return -1;
     }
   }
 
-
+  // Easy start: calculate the pressure threshold
   cal.z_thres = 0;
   for (int i = 0; i < 5; i++)
     cal.z_thres += raw_xyz[i][2];
-
-  cal.z_thres /= 15;  // A bit less than half the average
+  cal.z_thres /= 15;  // 1/3 of the average
   
+  // OK, now the tricky part.  This is probably not optimal..
+  cal.x_scale = (2 * (LCD_W - 2 * CAL_EDGE_DIST)  * (1<<12)) / (raw_xyz[1][0] + raw_xyz[2][0] - raw_xyz[0][0] - raw_xyz[3][0]);
+  cal.y_scale = (2 * (LCD_H - 2 * CAL_EDGE_DIST)  * (1<<12)) / (raw_xyz[2][1] + raw_xyz[3][1] - raw_xyz[0][1] - raw_xyz[1][1]);
+
+  int32_t tgt_sum_x = 0, tgt_sum_y = 0, obs_sum_x = 0, obs_sum_y = 0;
+  for (int i = 0; i < 5; i++) {
+    obs_sum_x += raw_xyz[i][0];
+    obs_sum_y += raw_xyz[i][1];
+    tgt_sum_x += tgt_xy[i][0];
+    tgt_sum_y += tgt_xy[i][1];
+  }
+  cal.x_offset = (tgt_sum_x - ((obs_sum_x * cal.x_scale) >> 12)) / 5;
+  cal.y_offset = (tgt_sum_y - ((obs_sum_y * cal.y_scale) >> 12)) / 5;
+  
+  // Display results so they can be hard-coded into firmware
   lcd_clear();
-  lcd_textbox_prep(0, 0, 300, 110, LCD_DARKGREY);
-  lcd_printf(LCD_GREEN, &FreeMono9pt7b, "z_thres = %d\n"
-             "x_scale = %.2f * LCD_W\n"
+  lcd_textbox_prep(0, 0, 300, 90, LCD_DARKGREY);
+  lcd_printf(LCD_WHITE, &FreeMono9pt7b, "z_thres = %d\n"
+             "x_scale = %.3f * LCD_W\n"
              "x_offset = %d px\n"
-             "y_scale = %.2f * LCD_H\n"
-             "x_offset = LCD_H %+d px\n"
-             "Touch to continue.",
+             "y_scale = %.3f * LCD_H\n"
+             "x_offset = LCD_H %+d px\n",
              cal.z_thres,
              cal.x_scale * 1.0 / LCD_W,
              cal.x_offset,
              cal.y_scale * 1.0 / LCD_H,
-             cal.y_offset - LCD_H
-             );
+             cal.y_offset - LCD_H);
   
   lcd_textbox_show();
+  lcd_textbox_prep(300, 0, 180, 90, LCD_BLACK);
+  for (int i = 0; i < 5; i++)
+    lcd_printf(LCD_GREEN, &FreeMono9pt7b, "%5d%5d%5d\n",
+               raw_xyz[i][0], raw_xyz[i][1], raw_xyz[i][2]);
+  lcd_textbox_show();
+
+
+  lcd_textbox_prep(LCD_W / 2 - 155, LCD_H/2 - 12, 310, 50, LCD_BLACK);
+  // Sanity check
+  if (cal.x_scale < X_SCALE_DEF - 80 || cal.x_scale > X_SCALE_DEF + 80
+      || cal.y_scale < Y_SCALE_DEF - 60 || cal.y_scale > Y_SCALE_DEF + 60
+      || cal.x_offset < X_OFFSET_DEF - 50 || cal.x_offset > X_OFFSET_DEF + 50
+      || cal.y_offset < Y_OFFSET_DEF - 50 || cal.y_offset > Y_OFFSET_DEF + 50) {
+    cal.x_scale = X_SCALE_DEF;
+    cal.x_offset = X_OFFSET_DEF;
+    cal.y_scale = Y_SCALE_DEF;
+    cal.y_offset = Y_OFFSET_DEF;
+    cal.z_thres = Z_THRES_DEF;
+    lcd_printf(LCD_RED, &FreeSansBold12pt7b, "Cal failed; using defaults.\n");
+  }
+  lcd_textbox_move_cursor(55, 0, 1);
+  lcd_printf(LCD_WHITE, &FreeSans12pt7b, "Touch to continue.");
+  lcd_textbox_show();  
 
   while (!touch_get(NULL, NULL));
   lcd_clear();
