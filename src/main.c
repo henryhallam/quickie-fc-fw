@@ -12,10 +12,8 @@
 int main(void)
 {
 	board_setup();
-        //        banner();
+        banner();
 
-        touch_cal();
-        
         lcd_textbox_prep(170, 220, 140, 50, LCD_BLUE);
         lcd_textbox_move_cursor(11, 38, 1);
         lcd_printf(LCD_WHITE, &FreeSans18pt7b, "START");
@@ -42,14 +40,18 @@ int main(void)
               mc_data_l.state = 0;
           }
           mc_data_r.age = mtime() / 1000;
+
+          uint32_t t0 = mtime();
           gui_mc_update(&gui_mc_l, &mc_data_l);
           gui_mc_update(&gui_mc_r, &mc_data_r);
-          int touch_x = 0, touch_y = 0, touch_detected = 0;
-          touch_detected = touch_get(&touch_x, &touch_y);
-          lcd_textbox_prep(0, LCD_H - 18, 220, 18, LCD_BLACK);
-          lcd_printf(touch_detected ? LCD_GREEN : LCD_BLUE, &FreeMono9pt7b, "%5d %5d", touch_x, touch_y);
+          uint32_t t_refresh = mtime() - t0;
+
+          lcd_textbox_prep(0, LCD_H - 15, 200, 15, LCD_BLACK);
+          lcd_printf(LCD_GREEN, &FreeMono9pt7b, "Refresh: %d ms", (int)t_refresh);
           lcd_textbox_show();
-          if (touch_detected) {
+
+          int touch_x, touch_y;
+          if (touch_get(&touch_x, &touch_y)) {
             if (lcd_fb_prep(touch_x - 3, touch_y - 3, 7, 7, LCD_PURPLE))
               lcd_fb_show();
           }
