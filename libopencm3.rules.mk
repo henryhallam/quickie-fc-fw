@@ -134,6 +134,7 @@ list: $(BINARY).list
 
 images: $(BINARY).images
 flash: $(BINARY).flash
+debug: $(BINARY).debug
 stlink-flash: $(BINARY).stlink-flash
 dfu-flash: $(BINARY).dfu-flash
 
@@ -235,6 +236,12 @@ endif
 	$(Q)$(GDB) -nx --batch \
 	           -ex 'target extended-remote $(BMP_PORT)' \
 	           -x $(SCRIPT_DIR)/black_magic_probe_flash.scr \
+	           $(*).elf
+
+%.debug: %.elf
+	@printf "  GDB/BMP $(BMP_PORT) $(*).elf (debug)\n"
+	$(Q)$(GDB) -ex 'target extended-remote $(BMP_PORT)' \
+	           -x $(SCRIPT_DIR)/black_magic_probe_debug.scr \
 	           $(*).elf
 
 %.dfu-flash: %.bin

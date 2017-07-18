@@ -25,11 +25,12 @@ LDSCRIPT = ../1bitsy-stm32f415rgt.ld
 
 # You can enable size optimization for project deployment, but it can get
 # in the way of debugging your code
-#CFLAGS		+= -Os
+CFLAGS		+= -Og
 
 # If your project is using a specific C standard you can set it by uncommenting
 # the following line and adjusting the -std flag accordingly
 #CFLAGS		+= -std=gnu11 -pedantic
+CFLAGS		+= -Wall -Werror -Wno-error=unused-function
 
 include ../libopencm3.target.mk
 
