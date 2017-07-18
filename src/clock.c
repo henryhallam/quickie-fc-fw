@@ -42,15 +42,17 @@ void sys_tick_handler(void)
 	system_millis++;
 }
 
-/* simple sleep for delay microseconds (must be less than systick period) */
+/* busywait for delay microseconds */
 void usleep(uint32_t delay)
 {
-  int32_t wake = systick_get_value() - delay * sysclock_mhz + 80;
-  if (wake <= 0)
-    wake += systick_reload;
-  while ((systick_get_value() - (uint32_t)wake) < systick_reload);
+  while (delay) {
+    uint32_t delay_segment = (delay >= (systick_reload / 2 / sysclock_mhz)) ? (systick_reload / 2 / sysclock_mhz - 1) : delay;
+    delay -= delay_segment;
+    int32_t wake = - delay_segment * sysclock_mhz + 60;
+    wake += systick_get_value();
+    while (((systick_reload + (int32_t)systick_get_value() - wake) % systick_reload) < systick_reload / 2);
+  }
 }
-
 /* simple sleep for delay milliseconds */
 void msleep(uint32_t delay)
 {
