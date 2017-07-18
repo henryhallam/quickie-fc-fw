@@ -1,8 +1,10 @@
 #include "lcd.h"
 #include "font.h"
 #include "clock.h"
-#include <libopencm3/stm32/spi.h>
+#include <libopencm3/stm32/dma.h>
 #include <libopencm3/stm32/gpio.h>
+#include <libopencm3/cm3/nvic.h>
+#include <libopencm3/stm32/spi.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -251,8 +253,37 @@ void lcd_clear(void) {
   lcd_fill_rect(0, 0, LCD_W, LCD_H, LCD_BLACK);
 }
 
+
+static void lcd_dma_setup(void)
+{
+  /* SPI2 TX uses DMA controller 1 Stream 4 Channel 0. */
+  /* Enable DMA1 clock and IRQ */
+  dma_stream_reset(DMA1, DMA_STREAM4);
+  nvic_enable_irq(NVIC_DMA1_STREAM4_IRQ);
+  dma_set_priority(DMA1, DMA_STREAM4, DMA_SxCR_PL_LOW);
+  dma_set_memory_size(DMA1, DMA_STREAM4, DMA_SxCR_MSIZE_16BIT);
+  dma_set_peripheral_size(DMA1, DMA_STREAM4, DMA_SxCR_PSIZE_16BIT);
+  dma_enable_memory_increment_mode(DMA1, DMA_STREAM4);
+  dma_set_transfer_mode(DMA1, DMA_STREAM4,
+                        DMA_SxCR_DIR_MEM_TO_PERIPHERAL);
+  /* The register to target is the SPI2 data register */
+  dma_set_peripheral_address(DMA1, DMA_STREAM4, (uint32_t) &SPI2_DR);
+  dma_enable_transfer_complete_interrupt(DMA1, DMA_STREAM4);
+  dma_channel_select(DMA1, DMA_STREAM4, DMA_SxCR_CHSEL_0);
+}
+
+static volatile int dma_done = 0;
+void dma1_stream4_isr(void)
+{
+  if (dma_get_interrupt_flag(DMA1, DMA_STREAM4, DMA_TCIF)) {
+    dma_done = 1;
+    dma_clear_interrupt_flags(DMA1, DMA_STREAM4, DMA_TCIF);
+  }
+}
+
 void lcd_setup(void) {
   lcd_backlight_set(0);
+  lcd_dma_setup();
   // Toggle LCD_RESET#
   gpio_clear(GPIOA, GPIO3);
   msleep(160);  // Longer than the 2 us the datasheet says, mostly to allow for power stabilization.
@@ -270,12 +301,16 @@ void lcd_blit(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t *da
   ASSERT_LCD_DATA;
   ASSERT_LCD_CS;
   uint32_t n = w * h;
-  while (n--) {
-    uint8_t hi = *data >> 8, lo = *data & 0xFF;
-    data++;
-    (void) spi_xfer(LCD_SPI, hi);
-    (void) spi_xfer(LCD_SPI, lo);
-  }
+  dma_set_memory_address(DMA1, DMA_STREAM4, (uint32_t) data);
+  dma_set_number_of_data(DMA1, DMA_STREAM4, n);
+  dma_enable_stream(DMA1, DMA_STREAM4);
+  dma_done = 0;
+  spi_set_dff_16bit(LCD_SPI);
+  spi_enable_tx_dma(LCD_SPI);
+  while (!dma_done);  // TODO: Async
+  while (SPI2_SR & SPI_SR_BSY);  // DMA done doesn't mean it's safe to release CS
+  spi_disable_tx_dma(LCD_SPI);
+  spi_set_dff_8bit(LCD_SPI);
   RELEASE_LCD_DATA;
   RELEASE_LCD_CS;
 }

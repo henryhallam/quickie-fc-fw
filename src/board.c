@@ -8,6 +8,11 @@
 #include "touch.h"
 #include "leds.h"
 
+/* All pins are allocated in this file, though they may be re-setup by peripheral drivers. 
+   We'll also book-keep shared resources such as DMA below:
+    - DMA1 Channel 0 Stream 4: LCD SPI
+*/
+
 static void pins_setup(void)
 {
   /* Enable GPIO clocks. */
@@ -84,11 +89,16 @@ static void spi_setup(void) {
                   SPI_CR1_MSBFIRST);
   //spi_enable_ss_output(SPI2);
   spi_enable(SPI2);
-  
+}
+
+static void dma_setup(void) {
+  // Just enable the clock to the DMA controllers in use; the peripheral drivers will configure it.
+  rcc_periph_clock_enable(RCC_DMA1);
 }
 
 void board_setup(void) {
   clock_setup();
+  dma_setup();
   pins_setup();
   spi_setup();
   leds_setup();
