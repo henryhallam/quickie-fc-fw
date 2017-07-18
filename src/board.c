@@ -105,3 +105,40 @@ void board_setup(void) {
   lcd_setup();
   touch_setup();
 }
+
+void relay_ctl(relay_e relay, int state) {
+  switch(relay) {
+  case 1:
+    if (state)
+      gpio_set(GPIOA, GPIO6);
+    else
+      gpio_clear(GPIOA, GPIO6);
+    break;
+  case 2:
+    if (state)
+      gpio_set(GPIOB, GPIO1);
+    else
+      gpio_clear(GPIOB, GPIO1);
+    break;
+  case 3:
+    if (state)
+      gpio_set(GPIOB, GPIO11);
+    else
+      gpio_clear(GPIOB, GPIO11);
+    break;
+  case 4:
+    if (state)
+      gpio_set(GPIOB, GPIO13);
+    else
+      gpio_clear(GPIOB, GPIO13);
+    break;
+  case 5:
+    if (state)
+      gpio_set(GPIOC, GPIO9);
+    else
+      gpio_clear(GPIOC, GPIO9);
+    break;
+  default:
+    return;
+  }
+}
