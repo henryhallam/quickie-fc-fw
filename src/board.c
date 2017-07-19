@@ -3,10 +3,12 @@
 #include <libopencm3/stm32/spi.h>
 
 #include "board.h"
+#include "can.h"
 #include "clock.h"
+#include "font.h"
 #include "lcd.h"
-#include "touch.h"
 #include "leds.h"
+#include "touch.h"
 
 /* All pins are allocated in this file, though they may be re-setup by peripheral drivers. 
    We'll also book-keep shared resources such as DMA below:
@@ -42,7 +44,9 @@ static void pins_setup(void)
   gpio_mode_setup(GPIOB, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO5);  // SD_CS#
   gpio_mode_setup(GPIOB, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO6);      // FONA_TX
   gpio_mode_setup(GPIOB, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO7);      // FONA_RX
-  gpio_mode_setup(GPIOB, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO8);      // CAN_RX
+  gpio_set_af(GPIOB, GPIO_AF9, GPIO8);
+  gpio_mode_setup(GPIOB, GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO8);    // CAN_RX
+  gpio_set_af(GPIOB, GPIO_AF9, GPIO9);
   gpio_mode_setup(GPIOB, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9);      // CAN_TX
   gpio_set_af(GPIOB, GPIO_AF5, GPIO10);
   gpio_mode_setup(GPIOB, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO10);     // LCD_SCLK
@@ -100,10 +104,17 @@ void board_setup(void) {
   clock_setup();
   dma_setup();
   pins_setup();
-  spi_setup();
   leds_setup();
+  spi_setup();
   lcd_setup();
   touch_setup();
+  int r = can_setup();
+  if (r) {
+    lcd_textbox_prep(0, 0, 480, 45, LCD_BLACK);
+    lcd_printf(LCD_GREEN, &FreeMono9pt7b, "can_setup() = %d", r);
+    lcd_textbox_show();
+    msleep(1000);
+  }
 }
 
 void relay_ctl(relay_e relay, int state) {
