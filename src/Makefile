@@ -19,7 +19,7 @@
 
 BINARY = quickie-fc
 
-OBJS = main.o board.o can.o clock.o font.o lcd.o leds.o gui_fun.o gui_mc.o gui_msgs.o mc_telem.o touch.o
+OBJS = main.o board.o can.o clock.o font.o lcd.o leds.o gui_fun.o gui_main.o gui_mc.o gui_msgs.o mc_telem.o touch.o
 
 LDSCRIPT = ../1bitsy-stm32f415rgt.ld
 

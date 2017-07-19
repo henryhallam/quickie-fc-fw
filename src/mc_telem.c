@@ -15,4 +15,6 @@ void mc_telem_parse_pdo2(const uint8_t *data, mc_id_e mc_id) {
   mc_telem_t *mct = &mc_telem[mc_id];
   mct->Iq = *(float *)&data[0];
   mct->bus_v = *(uint32_t *)&data[4] * 0.1; // sent in decivolts
+
+  mct->torque = mct->Iq;  // TODO: Actual torque
 }
