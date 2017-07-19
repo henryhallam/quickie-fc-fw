@@ -26,37 +26,17 @@ int main(void)
         lcd_printf(LCD_GREEN, &FreeMono9pt7b, "%s", kittybutt);
         lcd_textbox_show();
         
-        gui_mc gui_mc_l, gui_mc_r;
-        gui_mc_init(&gui_mc_l, 0, 0);
-        gui_mc_init(&gui_mc_r, LCD_W - GUI_MC_W, 0);
+        gui_mc_draw_frame();
 
-        mc_gui_data_t mc_data_l = {320.0, 22.2, 30, 4850, 0.4, 0.77, {.all = 0}, KH_Disabled, 0};
-        mc_gui_data_t mc_data_r = {321.0, 21.3, 33, 4850, 0.39, 0.76, {.all = 0x3D}, KH_Torque, 0};
-
-        int i = 0;
         int do_relay_flip = 0;
 
-        int view_mode = 1;
-        lcd_clear();
+        int view_mode = 0;
         
 	while (1) {
-
-          i++;
-          if (i == 33) {
-            i = 0;
-            mc_data_l.state++;
-            if (mc_data_l.state >= KH_N_STATES)
-              mc_data_l.state = 0;
-          }
-          mc_data_r.age = mtime() / 1000;
-
-          //uint32_t t0 = mtime();
+          can_process_rx();
           switch(view_mode) {
           case 0:
-            gui_mc_update(&gui_mc_l, &mc_data_l);
-            gui_mc_update(&gui_mc_r, &mc_data_r);
-            //          uint32_t t_refresh = mtime() - t0;
-
+            gui_mc_draw_data();
             break;
           case 1:  // CAN debug
             can_show_debug();

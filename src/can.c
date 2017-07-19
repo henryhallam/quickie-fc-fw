@@ -2,13 +2,13 @@
 #include "clock.h"
 #include "font.h"
 #include "lcd.h"
+#include "mc_telem.h"
 #include <libopencm3/stm32/can.h>
 #include <libopencm3/cm3/nvic.h>
 #include <libopencm3/stm32/rcc.h>
 #include <string.h>
 
-volatile int can_rx_count;
-volatile int can_emerg_count;
+volatile can_stats_t can_stats;
 
 #define N_RX_SW_MAILBOX 6
 
@@ -23,12 +23,16 @@ volatile int can_emerg_count;
 #define ID_PDO1_R_RX ((5<<7) | CAN_ID_SIC_R)
 #define ID_PDO2_R_RX ((7<<7) | CAN_ID_SIC_R)
 
-static struct can_sw_mbx {
-  uint32_t rx_time;
-  uint32_t id, fmi;
-  uint8_t length, data[8];
-  bool ext, rtr, full;
-} can_sw_mbx[N_RX_SW_MAILBOX];
+enum {
+  SW_MBX_EMERG_L,
+  SW_MBX_EMERG_R,
+  SW_MBX_PDO1_L,
+  SW_MBX_PDO2_L,
+  SW_MBX_PDO1_R,
+  SW_MBX_PDO2_R,
+  N_RX_SW_MBX};
+
+static can_sw_mbx_t can_sw_mbx[N_RX_SW_MAILBOX];
 
 int can_setup(void) {
   memset(can_sw_mbx, 0, sizeof(can_sw_mbx));
@@ -69,8 +73,8 @@ int can_setup(void) {
 
   can_filter_id_list_32bit_init(CAN1, 0, ID_EMERG_L << (5 + 16), ID_EMERG_R << (5 + 16), 0, true);
   can_filter_id_list_16bit_init(CAN1, 1,
-                                ID_PDO1_L_RX << 5, ID_PDO2_L_RX << 5,
-                                ID_PDO1_R_RX << 5, ID_PDO2_R_RX << 5,
+                                ID_PDO2_L_RX << 5, ID_PDO1_L_RX << 5,
+                                ID_PDO2_R_RX << 5, ID_PDO1_R_RX << 5,
                                 1, true);
   
   can_enable_irq(CAN1, CAN_IER_FMPIE0);
@@ -81,29 +85,41 @@ int can_setup(void) {
 
 void can1_rx0_isr(void) {
   // Emergency!
-  can_emerg_count++;
+  can_stats.emerg_count++;
+  
+  can_sw_mbx_t rx;
+  rx.rx_time = mtime();
+  // TODO: re-implement can_receive to avoid double copy
+  can_receive(CAN1, 1, false, &rx.id, &rx.ext, &rx.rtr, &rx.fmi, &rx.length, rx.data);
+  
+  uint8_t sw_mbx_id = rx.fmi; // The filter match index is a little tricky
+  if (sw_mbx_id <= SW_MBX_EMERG_R && !can_sw_mbx[sw_mbx_id].full) {
+    rx.full = 1;
+    can_sw_mbx[sw_mbx_id] = rx;
+  }
+  // TODO: Dispatch time-critical emergency response
   can_fifo_release(CAN1, 0);
 }
 
 void can1_rx1_isr(void) {
-  struct can_sw_mbx rx;
+  can_sw_mbx_t rx;
   rx.rx_time = mtime();
   // TODO: re-implement can_receive to avoid double copy
   can_receive(CAN1, 1, false, &rx.id, &rx.ext, &rx.rtr, &rx.fmi, &rx.length, rx.data);
 
-  uint8_t sw_mbx_id = 2 + rx.fmi;
+  uint8_t sw_mbx_id = SW_MBX_PDO1_L + rx.fmi; // The filter match index is a little tricky
   if (sw_mbx_id < N_RX_SW_MAILBOX && !can_sw_mbx[sw_mbx_id].full) {
     rx.full = 1;
     can_sw_mbx[sw_mbx_id] = rx;
   }
-  can_rx_count++;
+  can_stats.rx_count++;
   can_fifo_release(CAN1, 1);
 }
 
 void can_show_debug(void) {
   lcd_textbox_prep(0, 0, 480, 2*18, LCD_BLACK);
-  lcd_printf(LCD_GREEN, &FreeMono9pt7b, "can_rx_count = %d  can_emerg_count = %d\n"
-             "MBX ID  ms_ago  Data", can_rx_count, can_emerg_count);
+  lcd_printf(LCD_GREEN, &FreeMono9pt7b, "rx_count = %d  emerg_count = %d\n"
+             "MBX ID  ms_ago  Data", can_stats.rx_count, can_stats.emerg_count);
   lcd_textbox_show();
 
   for (int i = 0; i < N_RX_SW_MAILBOX; i++) {
@@ -115,5 +131,28 @@ void can_show_debug(void) {
       lcd_printf(LCD_GREEN, &FreeMono9pt7b, " %02X", can_sw_mbx[i].data[j]);
     can_sw_mbx[i].full = 0;
     lcd_textbox_show();
+  }
+}
+
+void can_process_rx(void) {
+  // Called from the main loop to dispatch the various handlers
+  for (int i = 0; i < N_RX_SW_MAILBOX; i++) {
+    if (can_sw_mbx[i].full) {
+      switch(i) {
+      case SW_MBX_PDO1_L:
+        mc_telem_parse_pdo1(can_sw_mbx[i].data, MC_LEFT);
+        break;
+      case SW_MBX_PDO2_L:
+        mc_telem_parse_pdo2(can_sw_mbx[i].data, MC_LEFT);
+        break;
+      case SW_MBX_PDO1_R:
+        mc_telem_parse_pdo1(can_sw_mbx[i].data, MC_RIGHT);
+        break;
+      case SW_MBX_PDO2_R:
+        mc_telem_parse_pdo2(can_sw_mbx[i].data, MC_RIGHT);
+        break;
+      }
+      can_sw_mbx[i].full = 0;
+    }
   }
 }

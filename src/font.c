@@ -6,6 +6,9 @@ static uint16_t *fb;
 static int fb_w = 0, fb_h = 0;
 static int cursor_x = 0, cursor_y = 0;
 
+#define PROGMEM
+#include "Fonts/Roboto_Bold7pt7b.h"
+#include "Fonts/RobotoCondensed_Regular7pt7b.h"
 #include "Fonts/FreeSans24pt7b.h"
 #include "Fonts/FreeSans18pt7b.h"
 #include "Fonts/FreeSans12pt7b.h"

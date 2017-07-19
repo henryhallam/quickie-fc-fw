@@ -1,52 +1,60 @@
 #include "gui_mc.h"
+#include "mc_telem.h"
 #include "font.h"
 #include "lcd.h"
 #include <stdio.h>
 #include <math.h>
 
-int gui_mc_init(gui_mc *handle, int x, int y) {
-  if (x < 0 || y < 0 || x + GUI_MC_W > LCD_W || y + GUI_MC_H > LCD_H)
+#define TITLE_H 14
+#define TITLE_FONT Roboto_Bold7pt7b
+#define DATA_FONT RobotoCondensed_Regular7pt7b
+
+#define TITLE_W (GUI_MC_W * 0.36)
+#define DATA_W (GUI_MC_W * 0.32)
+
+int gui_mc_draw_frame(void) {
+  if (GUI_MC_X < 0 || GUI_MC_Y < 0 || GUI_MC_X + GUI_MC_W > LCD_W || GUI_MC_Y + GUI_MC_H > LCD_H)
     return -1;
-  handle->x = x;
-  handle->y = y;
-  lcd_textbox_prep(x, y, GUI_MC_W * 0.5, GUI_MC_H, LCD_DARKGREY);
-  lcd_printf(LCD_WHITE, &FreeSans9pt7b, "Bus V:\nBus I:\nTorque:\nRPM:\nCmd:\nMod:\nState:\nFault:\nComm:\n");
+  lcd_textbox_prep(GUI_MC_X, GUI_MC_Y, GUI_MC_W, TITLE_H, LCD_DARKGREY);
+  lcd_textbox_move_cursor(TITLE_W, 0, 1);
+  lcd_printf(LCD_WHITE, &TITLE_FONT, "Left");
+  lcd_textbox_move_cursor(TITLE_W + DATA_W, 10, 0);
+  lcd_printf(LCD_WHITE, &TITLE_FONT, "Right");
   lcd_textbox_show();
-  lcd_fill_rect(x + GUI_MC_W * 0.5, y, GUI_MC_W * 0.5, GUI_MC_H, LCD_DARKGREY);
+  lcd_textbox_prep(GUI_MC_X, GUI_MC_Y + TITLE_H, TITLE_W, GUI_MC_H - TITLE_H, LCD_DARKGREY);
+  lcd_printf(LCD_WHITE, &TITLE_FONT, "Bus V:\nBus I:\nTorque:\nRPM:\nT_SiC:\nT_Mot:\nCmd:\nMod:\nState:\nFault:\n");
+  lcd_textbox_show();
+  lcd_fill_rect(GUI_MC_X + TITLE_W, GUI_MC_Y + TITLE_H, DATA_W * 2, GUI_MC_H - TITLE_H, LCD_DARKGREY);
   return 0;
 }
 
-void gui_mc_update(gui_mc *handle, const mc_gui_data_t *data) {
+void gui_mc_draw_data(void) {
   const char *motor_state_names[] = {"Init", "Fault", "Disable", "Ready", "Soft", "SoftIrq", "FlyStrt", "Torque", "Offset", "Speed"};
 
-  if (data == NULL)
-    return;
-
-  lcd_textbox_prep(handle->x + GUI_MC_W * 0.5, handle->y + 1, GUI_MC_W * 0.5, GUI_MC_H - 1, LCD_DARKGREY);
-  lcd_printf(LCD_CYAN, &FreeSansBold9pt7b, "%.0f\n%.1f\n%.1f\n%.0f\n%.0f%%\n%.0f%%\n%s\n",
-             data->bus_v, data->bus_i, data->torque, data->rpm, 100 * data->cmd, 100 * data->mod_index,
-             motor_state_names[data->state]);
-  if (data->faults.all) {
-    // TODO: better fault description
-    if (data->faults.flags.uvlo)
-      lcd_printf(LCD_RED, &FreeSans9pt7b, "U");
-    if (data->faults.flags.ovlo)
-      lcd_printf(LCD_RED, &FreeSans9pt7b, "V");
-    if (data->faults.flags.oclo)
-      lcd_printf(LCD_RED, &FreeSans9pt7b, "C");
-    if (data->faults.flags.over_temp)
-      lcd_printf(LCD_RED, &FreeSans9pt7b, "T");
-    if (data->faults.flags.hw_fault)
-      lcd_printf(LCD_RED, &FreeSans9pt7b, "H");
-    if (data->faults.flags.overspeed)
-      lcd_printf(LCD_RED, &FreeSans9pt7b, "S");
-  } else {
-    lcd_printf(LCD_CYAN, &FreeSans9pt7b, "-");
+  for (mc_id_e i = MC_LEFT; i < N_MCS; i++) {
+    mc_telem_t *data = &mc_telem[i];
+    lcd_textbox_prep(GUI_MC_X + TITLE_W + DATA_W * i, GUI_MC_Y + TITLE_H, DATA_W, GUI_MC_H - TITLE_H, LCD_DARKGREY);
+    lcd_textbox_move_cursor(0, 11, 0);
+    lcd_printf(LCD_CYAN, &DATA_FONT, "%.0f\n%.1f\n%.1f\n%.0f\n%.1f\n%.1f\n%.0f%%\n%.0f%%\n%s\n",
+               data->bus_v, data->bus_i, data->torque, data->rpm, data->temp_SiC, data->temp_motor, 100 * data->cmd, 100 * data->mod_index,
+               motor_state_names[data->state]);
+    if (data->faults.all) {
+      // TODO: better fault description
+      if (data->faults.flags.uvlo)
+        lcd_printf(LCD_RED, &DATA_FONT, "U");
+      if (data->faults.flags.ovlo)
+        lcd_printf(LCD_RED, &DATA_FONT, "V");
+      if (data->faults.flags.oclo)
+        lcd_printf(LCD_RED, &DATA_FONT, "C");
+      if (data->faults.flags.over_temp)
+        lcd_printf(LCD_RED, &DATA_FONT, "T");
+      if (data->faults.flags.hw_fault)
+        lcd_printf(LCD_RED, &DATA_FONT, "H");
+      if (data->faults.flags.overspeed)
+        lcd_printf(LCD_RED, &DATA_FONT, "S");
+    } else {
+      lcd_printf(LCD_CYAN, &DATA_FONT, "-");
+    }
+    lcd_textbox_show();
   }
-  if (data->age == 0) {
-    lcd_printf(LCD_CYAN, &FreeSansBold9pt7b, "\nOK\n");
-  } else {
-    lcd_printf(LCD_RED, &FreeSansBold9pt7b, "\n%d:%02d\n", (int)(data->age / 60), (int)(data->age % 60));
-  }
-  lcd_textbox_show();
 }
