@@ -7,6 +7,7 @@
 #include "gui_mc.h"
 #include "lcd.h"
 #include "leds.h"
+#include "ltc6804.h"
 #include "mc_telem.h"
 #include "touch.h"
 #include <libopencm3/cm3/systick.h>
@@ -118,15 +119,16 @@ int main(void)
 	board_setup();
         //        banner();
         //        touch_cal();
-
+        /*
         lcd_textbox_prep(LCD_W - 125, 22, 125, 155, LCD_BLACK);
         lcd_printf(LCD_GREEN, &FreeMono9pt7b, "%s", kittybutt);
         lcd_textbox_show();
         
         gui_mc_draw_frame();
         gui_main_draw_frame();
-
-        int view_mode = 0;
+        */
+        ltc6804_init();
+        int view_mode = 2;
         
 	while (1) {
           can_process_rx();
@@ -138,6 +140,9 @@ int main(void)
             break;
           case 1:  // CAN debug
             can_show_debug();
+            break;
+          case 2:  // Batt debug
+            ltc6804_demo();
             break;
           }
 

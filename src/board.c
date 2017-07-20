@@ -74,8 +74,11 @@ static void pins_setup(void)
   gpio_set_af(GPIOC, GPIO_AF3, GPIO8);
   gpio_mode_setup(GPIOC, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO8);      // LED3_R/G#
   gpio_mode_setup(GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO9);  // RELAY5_CMD
+  gpio_set_af(GPIOC, GPIO_AF6, GPIO10);
   gpio_mode_setup(GPIOC, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO10);     // IsoSPI_SCLK
+  gpio_set_af(GPIOC, GPIO_AF6, GPIO11);
   gpio_mode_setup(GPIOC, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO11);     // IsoSPI_MISO
+  gpio_set_af(GPIOC, GPIO_AF6, GPIO12);
   gpio_mode_setup(GPIOC, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO12);     // IsoSPI_MOSI
   gpio_mode_setup(GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO13); // LCD_TOUCH_X+
 
@@ -86,13 +89,23 @@ static void pins_setup(void)
 static void spi_setup(void) {
   /* SPI2 for LCD and SD Card */
   rcc_periph_clock_enable(RCC_SPI2);
-  spi_init_master(SPI2, SPI_CR1_BAUDRATE_FPCLK_DIV_2,
+  spi_init_master(SPI2, SPI_CR1_BAUDRATE_FPCLK_DIV_2,  // As fast as possible, i.e. 21 MHz
                   SPI_CR1_CPOL_CLK_TO_0_WHEN_IDLE,
                   SPI_CR1_CPHA_CLK_TRANSITION_1,
                   SPI_CR1_DFF_8BIT,
                   SPI_CR1_MSBFIRST);
   //spi_enable_ss_output(SPI2);
   spi_enable(SPI2);
+  
+  /* SPI3 for isoSPI */
+  rcc_periph_clock_enable(RCC_SPI3);
+  spi_init_master(SPI3, SPI_CR1_BAUDRATE_FPCLK_DIV_64,  // 656.25 kHz.  LTC6820 says 1 MHz max.
+                  SPI_CR1_CPOL_CLK_TO_1_WHEN_IDLE,      // CPOL = 1
+                  SPI_CR1_CPHA_CLK_TRANSITION_2,        // CPHA = 1
+                  SPI_CR1_DFF_8BIT,
+                  SPI_CR1_MSBFIRST);
+  //spi_enable_ss_output(SPI3);
+  spi_enable(SPI3);
 }
 
 static void dma_setup(void) {
