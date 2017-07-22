@@ -2,9 +2,7 @@
 #include "can.h"
 #include "clock.h"
 #include "font.h"
-#include "gui_fun.h"
-#include "gui_main.h"
-#include "gui_mc.h"
+#include "gui.h"
 #include "lcd.h"
 #include "leds.h"
 #include "ltc6804.h"
@@ -19,7 +17,6 @@
 #define START_BUTTON_Y 220
 #define START_BUTTON_W 140
 #define START_BUTTON_H 50
-
 
 static void draw_button(const char *txt, uint16_t bg) {
   lcd_textbox_prep(START_BUTTON_X, START_BUTTON_Y, START_BUTTON_W, START_BUTTON_H, bg);
@@ -117,37 +114,14 @@ static void handle_sys(void) {
 int main(void)
 {
 	board_setup();
-        //        banner();
-        //        touch_cal();
-        /*
-        lcd_textbox_prep(LCD_W - 125, 22, 125, 155, LCD_BLACK);
-        lcd_printf(LCD_GREEN, &FreeMono9pt7b, "%s", kittybutt);
-        lcd_textbox_show();
-        
-        gui_mc_draw_frame();
-        gui_main_draw_frame();
-        */
-        ltc6804_init();
-        int view_mode = 2;
+        //ltc6804_init();
+
+        gui_setup();
         
 	while (1) {
           can_process_rx();
           handle_sys();
-          switch(view_mode) {
-          case 0:
-            gui_mc_draw_data();
-            gui_main_draw_data();
-            break;
-          case 1:  // CAN debug
-            can_show_debug();
-            break;
-          case 2:  // Batt debug
-            ltc6804_demo();
-            break;
-          }
-
-
-
+          gui_update();
 	}
 
 	return 0;

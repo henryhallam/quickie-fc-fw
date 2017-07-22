@@ -12,6 +12,8 @@
 void msleep(uint32_t);
 void usleep(uint32_t);
 uint32_t mtime(void);
+int utime_tock(int tick);
+int utime_tick(void);
 void clock_setup(void);
 
 #endif /* generic header protector */

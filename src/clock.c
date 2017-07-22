@@ -42,6 +42,19 @@ void sys_tick_handler(void)
 	system_millis++;
 }
 
+
+/* For measurement of short intervals: call tick to get a token, pass it to tock */
+int utime_tick(void) {
+  return (int)systick_get_value();
+}
+
+int utime_tock(int tick) {
+  int t2 = systick_get_value();
+  if (t2 < tick)
+    return (tick - t2) / sysclock_mhz;
+  return (tick - t2 + systick_reload) / sysclock_mhz;
+}
+
 /* busywait for delay microseconds */
 void usleep(uint32_t delay)
 {

@@ -305,9 +305,17 @@ void lcd_blit(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t *da
 void lcd_fill_rect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) {
 
   // rudimentary clipping
-  if((x >= LCD_W) || (y >= LCD_H) || x < 0 || y < 0 || w <= 0 || h <= 0) return;
-  if((x + w - 1) >= LCD_W)  w = LCD_W  - x;
-  if((y + h - 1) >= LCD_H) h = LCD_H - y;
+  //  if((x >= LCD_W) || (y >= LCD_H) || x < 0 || y < 0 || w <= 0 || h <= 0) return;
+  if (x >= LCD_W)
+    x = LCD_W - 1;
+  else if (x < 0)
+    x = 0;
+  if (y >= LCD_H)
+    y = LCD_H - 1;
+  else if (y < 0)
+    y = 0;
+  if((x + w) > LCD_W) w = LCD_W  - x;
+  if((y + h) > LCD_H) h = LCD_H - y;
   lcd_blit_dma(x, y, w, h, &color, 1);
 }
 

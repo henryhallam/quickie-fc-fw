@@ -19,14 +19,14 @@
 
 BINARY = quickie-fc
 
-OBJS = main.o board.o can.o clock.o font.o lcd.o leds.o ltc6804.o gui_fun.o gui_main.o gui_mc.o gui_msgs.o mc_telem.o touch.o
+OBJS = main.o board.o can.o clock.o font.o lcd.o leds.o ltc6804.o gui.o gui_bat.o gui_fun.o gui_main.o gui_mc.o gui_msgs.o mc_telem.o touch.o
 LDLIBS = -lm
 
 LDSCRIPT = ../1bitsy-stm32f415rgt.ld
 
 # You can enable size optimization for project deployment, but it can get
 # in the way of debugging your code
-CFLAGS		+= -Og
+CFLAGS		+= -O3
 
 # If your project is using a specific C standard you can set it by uncommenting
 # the following line and adjusting the -std flag accordingly

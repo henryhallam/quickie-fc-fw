@@ -12,7 +12,11 @@
 
 /* All pins are allocated in this file, though they may be re-setup by peripheral drivers. 
    We'll also book-keep shared resources such as DMA below:
-    - DMA1 Channel 0 Stream 4: LCD SPI
+    - DMA1 stream 2: IsoSPI RX (ch0)
+    - DMA1 stream 4: LCD SPI TX (ch0)
+    - DMA1 stream 5: IsoSPI TX (ch0)
+    - DMA1 stream 6: DAC2 (ch7)  TODO
+    - DMA2 stream 0: ADC1 (ch0)
 */
 
 static void pins_setup(void)
@@ -109,8 +113,9 @@ static void spi_setup(void) {
 }
 
 static void dma_setup(void) {
-  // Just enable the clock to the DMA controllers in use; the peripheral drivers will configure it.
+  // Just enable the clock to the DMA controllers in use; the peripheral drivers will configure the streams.
   rcc_periph_clock_enable(RCC_DMA1);
+  rcc_periph_clock_enable(RCC_DMA2);
 }
 
 void board_setup(void) {
