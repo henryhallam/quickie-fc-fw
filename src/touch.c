@@ -61,7 +61,8 @@ static struct cal_params cal = {.z_thres = Z_THRES_DEF,
                                 .y_scale = Y_SCALE_DEF, .y_offset = Y_OFFSET_DEF};
 
 static volatile uint16_t adc_results[N_ADC_CONVS_TOTAL] = {0};
-static volatile enum {TOUCH_SCAN_Z1, TOUCH_SCAN_Z2, TOUCH_SCAN_X, TOUCH_SCAN_Y} touch_scan_state;
+static volatile enum {TOUCH_SCAN_Z1, TOUCH_SCAN_Z2, TOUCH_SCAN_X, TOUCH_SCAN_Y}
+  touch_scan_state;
 
 static volatile uint16_t touch_raw_z = 0;
 static volatile uint16_t touch_raw_x = 0;
@@ -83,7 +84,7 @@ static inline uint8_t setup_y(void) {
   gpio_mode_setup(TOUCH_GPIO, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_YP);
   gpio_mode_setup(TOUCH_GPIO, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO_XN);
   gpio_mode_setup(TOUCH_GPIO, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO_XP);
-  return ADC_CH_XN;
+  return ADC_CH_XN;  // Channel to scan
 
 }
 
@@ -99,7 +100,7 @@ static inline uint8_t setup_x(void) {
   gpio_mode_setup(TOUCH_GPIO, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_XP);
   gpio_mode_setup(TOUCH_GPIO, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO_YN);
   gpio_mode_setup(TOUCH_GPIO, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO_YP);
-  return ADC_CH_YP;  // scan this channel
+  return ADC_CH_YP;  // Channel to scan
 }
 
 static inline uint8_t setup_z(void) {
@@ -115,15 +116,12 @@ static inline uint8_t setup_z(void) {
   gpio_mode_setup(TOUCH_GPIO, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_YN);
   gpio_mode_setup(TOUCH_GPIO, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO_XN);
   gpio_mode_setup(TOUCH_GPIO, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO_YP);
-  return ADC_CH_XN;  // scan this channel for z1
+  return ADC_CH_XN;  // Channel to scan for z1; YP for z2.
 }
 
 static inline void start_adc_seq(uint8_t touch_ch) {
   /*
-  for (int i = N_ADC_CONVS_BAT; i < N_ADC_CONVS_TOTAL; i++)
-    channel_array[i] = touch_ch;
-  adc_set_regular_sequence(TOUCH_ADC, N_ADC_CONVS_TOTAL, channel_array);
-  adc_start_conversion_regular(TOUCH_ADC);
+    adc_set_regular_sequence() and adc_start_conversion_regular() are unpalatably slow given we're doing this from interrupt context
   */
   ADC1_SQR1 = ((N_ADC_CONVS_TOTAL - 1) << ADC_SQR1_L_LSB);
   ADC1_SQR2 = touch_ch | (touch_ch << 5) | (touch_ch << 10);
@@ -158,7 +156,7 @@ void dma2_stream0_isr(void)
 
     uint16_t median = opt_med7((uint16_t *)&adc_results[N_ADC_CONVS_BAT]);
     uint8_t next_ch;
-    switch (touch_scan_state) {  // which channel did we just convert?
+    switch (touch_scan_state) {  // which measurement did we just take?
     case TOUCH_SCAN_Z1:
       z = median; // actually just z1
       touch_scan_state = TOUCH_SCAN_Z2;
@@ -191,7 +189,6 @@ void dma2_stream0_isr(void)
       next_ch = setup_z();
       touch_scan_state = TOUCH_SCAN_Z1;
     }
-    (void)next_ch;
     start_adc_seq(next_ch);
   }
   gpio_clear(GPIOA, GPIO8); // LED / scope probe
@@ -228,18 +225,21 @@ void touch_setup(void) {
   
   adc_power_off(TOUCH_ADC);
   rcc_periph_reset_pulse(RST_ADC);
-  usleep(22);
   adc_enable_scan_mode(TOUCH_ADC);
   adc_disable_eoc_interrupt(TOUCH_ADC);  // We'll use the DMA interrupt instead, don't need both
-  //adc_eoc_after_group(TOUCH_ADC);
-  //adc_set_continuous_conversion_mode(TOUCH_ADC);
   adc_set_dma_continue(TOUCH_ADC);
+  /* 
+     Run the ADC as slow as possible, not so much for accuracy (though
+     the high effective input impedance is nice for the battery
+     monitors) as to reduce interrupt frequency.  This reduces CPU
+     load and spreads the repeated samples over a longer interval to
+     reduce the effect of interference bursts.
+   */
   adc_set_clk_prescale(ADC_CCR_ADCPRE_BY8);  // gives f_adc = 10.5 MHz
-  adc_set_sample_time_on_all_channels(TOUCH_ADC, ADC_SMPR_SMP_480CYC); // Long cycles not so much for accuracy as to reduce interrupt frequency
+  adc_set_sample_time_on_all_channels(TOUCH_ADC, ADC_SMPR_SMP_480CYC);
   adc_enable_dma(TOUCH_ADC);
   ADC1_SR = 0;
   adc_power_on(TOUCH_ADC);
-  usleep(22);
 
   // The whole sequence is interrupt driven, we have to bootstrap it.
   touch_scan_state = TOUCH_SCAN_Z1;
@@ -248,38 +248,47 @@ void touch_setup(void) {
 
 
 int touch_get(int *x, int *y) {
-  if (touch_raw_z < cal.z_thres)
+  nvic_disable_irq(NVIC_DMA2_STREAM0_IRQ);
+  int raw_x = touch_raw_x;
+  int raw_y = touch_raw_y;
+  int raw_z = touch_raw_z;
+  nvic_enable_irq(NVIC_DMA2_STREAM0_IRQ);
+  
+  if (raw_z < cal.z_thres)
     return 0;  // no touch
 
   if (x && y) {  // You can pass null ptrs if you don't care where the touch is
-    *x = ((touch_raw_x * cal.x_scale) >> 12) + cal.x_offset;
-    *y = ((touch_raw_y * cal.y_scale) >> 12) + cal.y_offset;
+    *x = ((raw_x * cal.x_scale) >> 12) + cal.x_offset;
+    *y = ((raw_y * cal.y_scale) >> 12) + cal.y_offset;
+    // Clip to screen borders, just in case
+    if (*x < 0)
+      *x = 0;
+    else if (*x >= LCD_W)
+      *x = LCD_W - 1;
+    if (*y < 0)
+      *y = 0;
+    else if (*y >= LCD_H)
+      *y = LCD_H - 1;
   }
 
-  // Clip to screen borders, just in case
-  if (*x < 0)
-    *x = 0;
-  else if (*x >= LCD_W)
-    *x = LCD_W - 1;
-  if (*y < 0)
-    *y = 0;
-  else if (*y >= LCD_H)
-    *y = LCD_H - 1;
-  return 1;
+  return raw_z;
 }
 
-/*
+
 // Return 0 on success, -1 on timeout or parameter error.
-static int touch_cal_point(int16_t tgt_x, int16_t tgt_y, int16_t raw_xyz[3]) {
+static int touch_cal_point(int16_t tgt_x, int16_t tgt_y, int raw_xyz[3]) {
 
   lcd_fill_rect(tgt_x - 3, tgt_y - 3, 7, 7, LCD_PURPLE);
   
   uint32_t t_start = mtime();
   int pressed = 0, count = 0, done = 0;
   while (mtime() - t_start < CAL_TIMEOUT) {
-    int16_t x_raw, y_raw, z_raw;
-    z_raw = touch_get_raw(&x_raw, &y_raw);
-    if (z_raw >= cal.z_thres) { // excludes noise error cases when touch_get_raw returns -1
+    nvic_disable_irq(NVIC_DMA2_STREAM0_IRQ);
+    int x_raw = touch_raw_x;
+    int y_raw = touch_raw_y;
+    int z_raw = touch_raw_z;
+    nvic_enable_irq(NVIC_DMA2_STREAM0_IRQ);
+    if (z_raw >= cal.z_thres) {
       if (!pressed) {
         count = 0;
         pressed = 1;
@@ -333,9 +342,10 @@ int touch_cal(void) {
                                 {CAL_EDGE_DIST, LCD_H - CAL_EDGE_DIST},
                                 {LCD_W / 2, LCD_H / 2}};
                                 
-  int16_t raw_xyz[5][3];
+  int raw_xyz[5][3];
   for (int i = 0; i < 5; i++) {
     if (touch_cal_point(tgt_xy[i][0], tgt_xy[i][1], raw_xyz[i]) != 0) {
+      // Timeout
       lcd_clear();
       cal.z_thres = Z_THRES_DEF;
       return -1;
@@ -407,7 +417,7 @@ int touch_cal(void) {
   msleep(222);
   return 0;
 }
-*/
+
 
 
 void touch_show_debug(void) {

@@ -35,7 +35,7 @@ void gui_setup(void) {
   gui.page_state = 0; // init
   lcd_clear();
           //        banner();
-        //        touch_cal();
+  touch_cal();
         /*
         lcd_textbox_prep(LCD_W - 125, 22, 125, 155, LCD_BLACK);
         lcd_printf(LCD_GREEN, &FreeMono9pt7b, "%s", kittybutt);
