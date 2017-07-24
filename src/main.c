@@ -120,7 +120,7 @@ int main(void)
         
 	while (1) {
           can_process_rx();
-          handle_sys();
+          //          handle_sys();
           gui_update();
 	}
 

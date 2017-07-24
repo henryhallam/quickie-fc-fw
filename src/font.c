@@ -23,15 +23,15 @@ static int cursor_x = 0, cursor_y = 0;
 
 #define X_MARGIN 2
 
-int lcd_textbox_prep(int x, int y, int w, int h, uint16_t bg) {
+uint16_t *lcd_textbox_prep(int x, int y, int w, int h, uint16_t bg) {
   fb = lcd_fb_prep(x, y, w, h, bg);
   if (!fb)
-    return -1;
+    return NULL;
   fb_w = w;
   fb_h = h;
   cursor_x = X_MARGIN;
   cursor_y = -1;
-  return 0;
+  return fb;
 }
 
 void lcd_textbox_show(void) {
@@ -45,6 +45,43 @@ void lcd_textbox_move_cursor(int x, int y, int rel) {
   } else {
     cursor_x = x;
     cursor_y = y;
+  }
+}
+
+void lcd_textbox_get_cursor(int *x, int *y) {
+  *x = cursor_x;
+  *y = cursor_y;
+}
+
+
+// Compute the width and height of a block of text
+void lcd_fake_printf(int *w, int *h, const GFXfont *font, const char *format, ...) {
+  char str[256];
+  int n_chars;
+  va_list args;
+  va_start (args, format);
+  n_chars = vsnprintf (str, sizeof(str), format, args);
+  va_end (args);
+
+  *w = *h = 0;
+  int x = 0, y = 0;
+  
+  for (int i = 0; i < n_chars; i++) {
+    int c = str[i];
+    if (c == '\n') {
+      y += font->yAdvance;
+      x = X_MARGIN;
+      continue;
+    }
+    if (c < font->first || c > font->last)
+      continue;
+    c -= font->first;
+    const GFXglyph *glyph  = &font->glyph[c];
+    if (x + glyph->xOffset + glyph->width > *w)
+      *w = x + glyph->xOffset + glyph->width;
+    x += glyph->xAdvance;
+    if (y + glyph->yOffset + glyph->height > *h)
+      *h = y + glyph->yOffset + glyph->height;
   }
 }
 

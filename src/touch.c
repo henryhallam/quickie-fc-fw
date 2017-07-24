@@ -427,16 +427,26 @@ void touch_show_debug(void) {
   const int draw_rad = 1;
   static int x=-1, y=-1;
   if (x >= 0 && y >= 0)
-    lcd_fill_rect(x - draw_rad, y - draw_rad, 2 * draw_rad + 1, 2 * draw_rad + 1, LCD_DARKGREY);
+    lcd_fill_rect(x - draw_rad, y - draw_rad, 2 * draw_rad + 1, 2 * draw_rad + 1, LCD_YELLOW);
   t = utime_tick();
   int r = touch_get(&x, &y);
   t = utime_tock(t);
   if (r) {
     touch++;
-    lcd_fill_rect(x - draw_rad, y - draw_rad, 2 * draw_rad + 1, 2 * draw_rad + 1, LCD_PURPLE);
+    lcd_fill_rect(x - draw_rad, y - draw_rad, 2 * draw_rad + 1, 2 * draw_rad + 1, LCD_RED);
   } else {
     no_touch++;
     x = y = -1;
+  }
+
+  static int graph_x = 0;
+  int graph_y = LCD_H - 20 - r / 15;
+  lcd_fill_rect(graph_x, graph_y, 1, 1, LCD_WHITE);
+  
+  graph_x++;
+  if (graph_x == LCD_W) {
+    lcd_clear();
+    graph_x = 0;
   }
   
   lcd_textbox_prep(0, LCD_H - 14, 222, 14, LCD_BLACK);

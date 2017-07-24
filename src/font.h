@@ -77,9 +77,11 @@ extern const GFXfont TomThumb;
 
 
 
-int lcd_textbox_prep(int x, int y, int w, int h, uint16_t bg);
+uint16_t * lcd_textbox_prep(int x, int y, int w, int h, uint16_t bg);
 int lcd_printf(uint16_t color, const GFXfont *font, const char *format, ...) __attribute__ ((format (printf, 3, 4)));
+void lcd_fake_printf(int *w, int *h, const GFXfont *font, const char *format, ...);
 void lcd_textbox_move_cursor(int x, int y, int rel);
+void lcd_textbox_get_cursor(int *x, int *y);
 void lcd_textbox_show(void);
 
 #endif // FONT_H

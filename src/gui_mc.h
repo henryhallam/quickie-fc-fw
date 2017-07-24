@@ -2,7 +2,7 @@
 #define GUI_MC__H
 
 #define GUI_MC_W 144
-#define GUI_MC_H 200
+#define GUI_MC_H 216
 
 #define GUI_MC_X 0
 #define GUI_MC_Y 0

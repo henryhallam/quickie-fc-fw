@@ -65,7 +65,7 @@ int gui_main_draw_frame(void) {
 }
 
 static void draw_bar(int x, float v, uint16_t color) {
-  if (v < 0.0) {
+  if (v < 0.0 || !isnormal(v)) {
     v = 0.0;
   } else if (v > 1.0) {
     v = 1.0;
@@ -109,34 +109,4 @@ void gui_main_draw_data(void) {
   draw_bar(GUI_MAIN_W / 2, mc_telem[MC_RIGHT].rpm * RPM_SCALE + RPM_OFFSET, RPM_BASE_COLOR);
   draw_bar(GUI_MAIN_W / 2 + BAR_W + 5, mc_telem[MC_RIGHT].torque * TORQUE_SCALE + TORQUE_OFFSET, TORQUE_BASE_COLOR);
   draw_bar(GUI_MAIN_W - 10 - BAR_W, mc_telem[MC_RIGHT].temp_SiC * TEMP_SCALE + TEMP_OFFSET, TEMP_BASE_COLOR);
-  /*
-  const char *motor_state_names[] = {"Init", "Fault", "Disable", "Ready", "Soft", "SoftIrq", "FlyStrt", "Torque", "Offset", "Speed"};
-
-  for (mc_id_e i = MC_LEFT; i < N_MCS; i++) {
-    mc_telem_t *data = &mc_telem[i];
-    lcd_textbox_prep(GUI_MC_X + TITLE_W + DATA_W * i, GUI_MC_Y + TITLE_H, DATA_W, GUI_MC_H - TITLE_H, LCD_DARKGREY);
-    lcd_textbox_move_cursor(0, 11, 0);
-    lcd_printf(LCD_CYAN, &DATA_FONT, "%.0f\n%.1f\n%.1f\n%.0f\n%.1f\n%.1f\n%.0f%%\n%.0f%%\n%s\n",
-               data->bus_v, data->bus_i, data->torque, data->rpm, data->temp_SiC, data->temp_motor, 100 * data->cmd, 100 * data->mod_index,
-               motor_state_names[data->state]);
-    if (data->faults.all) {
-      // TODO: better fault description
-      if (data->faults.flags.uvlo)
-        lcd_printf(LCD_RED, &DATA_FONT, "U");
-      if (data->faults.flags.ovlo)
-        lcd_printf(LCD_RED, &DATA_FONT, "V");
-      if (data->faults.flags.oclo)
-        lcd_printf(LCD_RED, &DATA_FONT, "C");
-      if (data->faults.flags.over_temp)
-        lcd_printf(LCD_RED, &DATA_FONT, "T");
-      if (data->faults.flags.hw_fault)
-        lcd_printf(LCD_RED, &DATA_FONT, "H");
-      if (data->faults.flags.overspeed)
-        lcd_printf(LCD_RED, &DATA_FONT, "S");
-    } else {
-      lcd_printf(LCD_CYAN, &DATA_FONT, "-");
-    }
-    lcd_textbox_show();
-  }
-  */
 }
