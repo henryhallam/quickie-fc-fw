@@ -1,4 +1,5 @@
 #include "gui.h"
+#include "board.h"
 #include "can.h"
 #include "clock.h"
 #include "lcd.h"
@@ -45,26 +46,38 @@ void gui_setup(void) {
 }
 
 
-#define BUTTONS_N_MAX 10
-#define BUTTON_COLOR_BG LCD_PURPLE
+#define DIM(arr) (sizeof(arr) / sizeof(arr[0]))
+
 #define BUTTON_COLOR_BORDER LCD_WHITE
 #define BUTTON_COLOR_TEXT LCD_WHITE
 #define BUTTON_COLOR_HOVER LCD_RED
 #define BUTTON_FONT FreeSans9pt7b
+#define BUTTON_DEBOUNCE_MS 100
 #define BUTTON_FONT_W (BUTTON_FONT.glyph[0].xAdvance)
 #define BUTTON_FONT_H (BUTTON_FONT.yAdvance)
-struct button {
+typedef struct {
   int16_t x, y, w, h;
+  uint16_t bg_color;
   const char *caption;
   bool hover;
-} buttons[BUTTONS_N_MAX];
+  bool clicked;
+} button_t;
 
-int n_buttons = 0;
+enum buttons_home_e {
+  BUTT_HOME_LMC, BUTT_HOME_RMC, BUTT_HOME_MODE1, BUTT_HOME_MODE2, BUTT_HOME_MENU
+};
+button_t buttons_home[] = {[BUTT_HOME_LMC] = {0, GUI_MC_H, GUI_MC_W / 2 + 1, 64, LCD_PURPLE, "L MC", 0, 0},
+                           [BUTT_HOME_RMC] = {GUI_MC_W / 2, GUI_MC_H, GUI_MC_W / 2, 64, LCD_PURPLE, "R MC", 0, 0},
+                           [BUTT_HOME_MODE1] = {GUI_MC_W, GUI_MC_H, GUI_MAIN_W, 64, LCD_BLUE, "Start", 0, 0},
+                           [BUTT_HOME_MODE2] = {GUI_MC_W + GUI_MAIN_W, GUI_MC_H, GUI_BAT_W / 2 + 1, 64, LCD_GREY, "Chg", 0, 0},
+                           [BUTT_HOME_MENU] = {GUI_MC_W + GUI_MAIN_W + GUI_BAT_W / 2, GUI_MC_H, GUI_BAT_W / 2, 64, LCD_GREY, "Menu", 0, 0},
+};
 
-static void draw_buttons(void) {
+static void draw_buttons(button_t *buttons, int n_buttons) {
   for (int i = 0; i < n_buttons; i++) {
-    struct button *butt = &buttons[i];
-    uint16_t *fb = lcd_textbox_prep(butt->x, butt->y, butt->w, butt->h, BUTTON_COLOR_BG);
+    button_t *butt = &buttons[i];
+    butt->hover = 0;
+    uint16_t *fb = lcd_textbox_prep(butt->x, butt->y, butt->w, butt->h, butt->bg_color);
 
     // Find size of caption so we can center it
     int text_w, text_h;
@@ -88,38 +101,41 @@ static void draw_buttons(void) {
   }
 }
 
-static void redraw_border(const struct button *button, uint16_t color) {
+static void redraw_border(const button_t *button, uint16_t color) {
   lcd_fill_rect(button->x, button->y, button->w, 1, color);
   lcd_fill_rect(button->x, button->y + button->h - 1, button->w, 1, color);
   lcd_fill_rect(button->x, button->y + 1, 1, button->h - 2, color);
   lcd_fill_rect(button->x + button->w - 1, button->y + 1, 1, button->h - 2, color);
 }
 
-static void handle_buttons(void) {
+static void handle_buttons(button_t *buttons, int n_buttons) {
+  static uint32_t t_down = 0;
   int touch_x, touch_y, touch_z;
   touch_z = touch_get(&touch_x, &touch_y);
   for (int i = 0; i < n_buttons; i++) {
-    struct button *butt = &buttons[i];
+    button_t *butt = &buttons[i];
+    butt->clicked = 0;
     if (touch_z) {
+      // Touching
       bool within_borders = touch_x > butt->x && touch_x < butt->x + butt->w
         && touch_y > butt->y && touch_y < butt->y + butt->h;
       if (within_borders && !butt->hover) {
         butt->hover = 1;
         redraw_border(butt, BUTTON_COLOR_HOVER);
+        t_down = mtime();
       } else if (!within_borders && butt->hover) {
         butt->hover = 0;
         redraw_border(butt, BUTTON_COLOR_BORDER);
       }
     } else {
-      // no touch
+      // No touching
       if (butt->hover) {
-        // Click!
-        lcd_textbox_prep(0, LCD_H - 14 * 2, 160, 14, LCD_BLACK);
-        static int clicks = 0;
-        lcd_printf(LCD_GREEN, &RobotoCondensed_Regular7pt7b, "Clicked '%s' (%d)", butt->caption, ++clicks);
-        lcd_textbox_show();
-        butt->hover = 0;
         redraw_border(butt, BUTTON_COLOR_BORDER);
+        // Click!
+        if (mtime() - t_down >= BUTTON_DEBOUNCE_MS) {
+          butt->clicked = 1;
+          butt->hover = 0;
+        }
       }
     }
   }
@@ -132,10 +148,7 @@ static void gui_home_update(void) {
     gui_mc_draw_frame();
     gui_main_draw_frame();
     gui_bat_draw_frame();
-    n_buttons = 2;
-    buttons[0].x = 0; buttons[0].y = GUI_MC_H; buttons[0].w = GUI_MC_W / 2 + 1; buttons[0].h = 64; buttons[0].caption = "L MC"; buttons[0].hover = 0;
-    buttons[1].x = GUI_MC_W / 2; buttons[1].y = GUI_MC_H; buttons[1].w = GUI_MC_W / 2; buttons[1].h = 64; buttons[1].caption = "R MC"; buttons[1].hover = 0;
-    draw_buttons();
+    draw_buttons(buttons_home, DIM(buttons_home));
     gui.page_state = DRAW_LEFT;
     break;
   case DRAW_LEFT:
@@ -148,7 +161,15 @@ static void gui_home_update(void) {
     break;
   case DRAW_RIGHT:
     gui_bat_draw_data();
-    handle_buttons();
+    handle_buttons(buttons_home, DIM(buttons_home));
+    if (buttons_home[BUTT_HOME_MODE1].clicked) {
+      static bool toggle = 0;
+      toggle = !toggle;
+      relay_ctl(RLY_PRECHG, toggle);
+      buttons_home[BUTT_HOME_MODE1].caption = toggle ? "Stop" : "Start";
+      buttons_home[BUTT_HOME_MODE1].bg_color = toggle ? LCD_RED : LCD_BLUE;
+      draw_buttons(&buttons_home[BUTT_HOME_MODE1], 1);
+    }
     gui.page_state = DRAW_BOTTOM;
     break;
   case DRAW_BOTTOM:

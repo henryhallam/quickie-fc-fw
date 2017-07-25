@@ -16,7 +16,7 @@ int gui_bat_draw_frame(void) {
     return -1;
   lcd_textbox_prep(GUI_BAT_X, GUI_BAT_Y, GUI_BAT_W, TITLE_H, LCD_DARKGREY);
   lcd_textbox_move_cursor(TITLE_W, 0, 1);
-  lcd_printf(LCD_WHITE, &TITLE_FONT, "Fuel FW Dist");
+  lcd_printf(LCD_WHITE, &TITLE_FONT, "Fuel  FW  Dist");
   lcd_textbox_show();
   lcd_textbox_prep(GUI_BAT_X, GUI_BAT_Y + TITLE_H, TITLE_W, GUI_BAT_H - TITLE_H, LCD_DARKGREY);
   lcd_printf(LCD_WHITE, &TITLE_FONT, "Vtot\nMax\nP90\nMean\nP10\nMin\nOOFam\nTmax\nFeed\ntOT\ntUV\nPwir");

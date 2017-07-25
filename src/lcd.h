@@ -18,6 +18,7 @@
 #define LCD_RGB565(r,g,b) (((r) << 11) | ((g) << 5) | (b))
 #define LCD_PURPLE  LCD_RGB565(13,13,19)
 #define LCD_DARKGREY  LCD_RGB565(4,8,4)
+#define LCD_GREY LCD_RGB565(15, 31, 15)
 #define LCD_LIGHTGREY LCD_RGB565(27, 54, 27)
 #define LCD_DARKRED LCD_RGB565(10, 0, 0)
 #define LCD_DARKYELLOW LCD_RGB565(10, 20, 0)
