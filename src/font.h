@@ -21,6 +21,9 @@ typedef struct { // Data stored for FONT AS A WHOLE:
 
 extern const GFXfont Roboto_Bold7pt7b;
 extern const GFXfont RobotoCondensed_Regular7pt7b;
+extern const GFXfont Roboto_Bold8pt7b;
+extern const GFXfont Roboto_Regular8pt7b;
+extern const GFXfont Roboto_Regular12pt7b;
 
 extern const GFXfont FreeMono12pt7b;
 extern const GFXfont FreeMono18pt7b;
