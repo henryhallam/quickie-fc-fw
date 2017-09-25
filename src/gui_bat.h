@@ -12,5 +12,6 @@
 int gui_bat_draw_frame(void);
 void gui_bat_draw_data(void);
 
+extern int packs_talking;
 
 #endif // GUI_BAT__H

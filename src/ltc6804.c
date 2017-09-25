@@ -13,7 +13,7 @@
 #include <libopencm3/cm3/nvic.h>
 #include <libopencm3/stm32/spi.h>
 
-#define CHAIN_MAX 9
+#define CHAIN_MAX 27
 
 #define V_TARGET 3.502
 
@@ -76,15 +76,19 @@
 #define LOG_INFO(fmt, ...) lcd_printf(LCD_WHITE, &RobotoCondensed_Regular7pt7b, fmt "\n", __VA_ARGS__)
 #define LOG_WARN(fmt, ...) lcd_printf(LCD_RED, &RobotoCondensed_Regular7pt7b, fmt "\n", __VA_ARGS__)
 
+typedef struct {
+  union {
+    uint8_t reg8[6];
+    uint16_t reg16[3];
+  };
+  bool pec_ok;
+} reg_group_t;
 
-typedef uint8_t u8;
-typedef uint16_t u16;
-
-static u16 pec15Table[256];
-static u16 CRC15_POLY = 0x4599;
+static uint16_t pec15Table[256];
+static uint16_t CRC15_POLY = 0x4599;
 static void init_PEC15_Table(void) {
   for (int i = 0; i < 256; i++) {
-      u16 remainder = i << 7;
+      uint16_t remainder = i << 7;
       for (int bit = 8; bit > 0; --bit)
         {
           if (remainder & 0x4000)
@@ -100,9 +104,9 @@ static void init_PEC15_Table(void) {
       pec15Table[i] = remainder&0xFFFF;
     }
 }
-static u16 pec15 (u8 *data , int len)
+static uint16_t pec15 (uint8_t *data , int len)
 {
-  u16 remainder, address;
+  uint16_t remainder, address;
   remainder = 16; //PEC seed
   for (int i = 0; i < len; i++)
     {
@@ -115,9 +119,13 @@ static u16 pec15 (u8 *data , int len)
 static void ltc6804_wakeup(void) {
   for (int i = 0; i < CHAIN_MAX; i++) {
     ASSERT_LTC6820_CS;
+    usleep(2);
     RELEASE_LTC6820_CS;
+    usleep(22);
     msleep(1);
   }
+  
+  
 }
 
 static void ltc_spi_dma_setup(void)
@@ -185,23 +193,22 @@ static void spi_xfer_dma(uint16_t n, const uint8_t *tx_buf, uint8_t *rx_buf) {
 }
 
 
-static int ltc6804_chat(u16 cc, u8 is_write, u8 n_chain, u8 *data) {
-  const int n_regs = data ? 6 : 0;
+static int ltc6804_chat(uint16_t cc, uint8_t is_write, uint8_t n_chain, reg_group_t *data) {
   /* Static buffer NOT in CCM */
-  static u8 dma_buffer[2+2+(6+2)*CHAIN_MAX] = {0};
+  static uint8_t dma_buffer[2+2+(6+2)*CHAIN_MAX] = {0};
 
 
   dma_buffer[0] = (cc & 0x0700) >> 8;
   dma_buffer[1] = cc & 0xFF;
-  u16 pec = pec15(dma_buffer, 2);
+  uint16_t pec = pec15(dma_buffer, 2);
   dma_buffer[2] = pec >> 8;
   dma_buffer[3] = pec & 0xFF;
   if (is_write) {
     for (int i = 0; i < n_chain; i++) {
-      memcpy(&dma_buffer[4+i*(n_regs+2)], &data[i*n_regs], n_regs);
-      pec = pec15(&dma_buffer[4+i*(n_regs+2)], n_regs);
-      dma_buffer[4+i*(n_regs+2)+n_regs] = pec >> 8;
-      dma_buffer[4+i*(n_regs+2)+n_regs+1] = pec & 0xFF;
+      memcpy(&dma_buffer[4+i*(6+2)], &data[i].reg8, 6);
+      pec = pec15(&dma_buffer[4+i*(6+2)], 6);
+      dma_buffer[4+i*(6+2)+6] = pec >> 8;
+      dma_buffer[4+i*(6+2)+6+1] = pec & 0xFF;
     }
   }
 
@@ -212,7 +219,7 @@ static int ltc6804_chat(u16 cc, u8 is_write, u8 n_chain, u8 *data) {
 #endif
   ASSERT_LTC6820_CS;
   usleep(1);
-  spi_xfer_dma(4+n_chain*(n_regs+2), dma_buffer, dma_buffer);
+  spi_xfer_dma(4+n_chain*(6+2), dma_buffer, dma_buffer);
   usleep(1);
   RELEASE_LTC6820_CS;
 #ifdef DEBUG_CHAT
@@ -221,23 +228,29 @@ static int ltc6804_chat(u16 cc, u8 is_write, u8 n_chain, u8 *data) {
            dma_buffer[5], dma_buffer[6], dma_buffer[7], dma_buffer[8], dma_buffer[9]);
 #endif
   int pec_fail = 0;
-  if (data && !is_write) {
+  if (!is_write) {
     for (int i = 0; i < n_chain; i++) {
-      memcpy(&data[i*n_regs], &dma_buffer[4+i*(n_regs+2)], n_regs);
-      pec = pec15(&dma_buffer[4+i*(n_regs+2)], n_regs);
-      if (pec != ((dma_buffer[4+i*(n_regs+2)+n_regs] << 8) | dma_buffer[4+i*(n_regs+2)+n_regs+1]))
-        pec_fail = i + 1;
+      if (data)
+        memcpy(&data[i].reg8, &dma_buffer[4+i*(6+2)], 6);
+      pec = pec15(&dma_buffer[4+i*(6+2)], 6);
+      if (pec == ((dma_buffer[4+i*(6+2)+6] << 8) | dma_buffer[4+i*(6+2)+6+1])) {
+        data[i].pec_ok = 1;
+      } else {
+        data[i].pec_ok = 0;
+        pec_fail = 1;
+      }
     }
   }
+#ifdef DEBUG_CHAT
   if (pec_fail)
     LOG_WARN("PEC fail %d", pec_fail);
-  
+#endif
   return pec_fail;
 }
 
 /*
-static void lightup_chain(u8 mask) {
-  u8 regs[3][6] = {0};
+static void lightup_chain(uint8_t mask) {
+  uint8_t regs[3][6] = {0};
   for (int i = 0; i < 3; i++)
     if (mask & (1<<i))
       regs[i][0] = 0x02;
@@ -247,22 +260,21 @@ static void lightup_chain(u8 mask) {
   ltc6804_wakeup();
   ltc6804_wakeup();
   ltc6804_wakeup();
-  ltc6804_chat(1, 1, 3, (u8 *)regs);
+  ltc6804_chat(1, 1, 3, (uint8_t *)regs);
 }
 */
 
-static int ltc6804_get_voltages(void) {
-  int n_chain = 1;
-
-  u16 mask = 0;
+int ltc6804_get_voltages(int n_chain) {
+  uint16_t mask = 0;
+  ltc6804_wakeup();
 
   ltc6804_chat(ADCV | AD_MD10 | CH_ALL, 0, n_chain, NULL);
   msleep(3);
-  u16 cv_regs[4][CHAIN_MAX][3];  // Each chain has 4 register groups, each with 3 16-bit values
-  ltc6804_chat(RDCVA, 0, n_chain, (u8 *)cv_regs[0]);
-  ltc6804_chat(RDCVB, 0, n_chain, (u8 *)cv_regs[1]);
-  ltc6804_chat(RDCVC, 0, n_chain, (u8 *)cv_regs[2]);
-  ltc6804_chat(RDCVD, 0, n_chain, (u8 *)cv_regs[3]);
+  reg_group_t cv_regs[4][CHAIN_MAX];  // Each chain has 4 register groups, each with 3 16-bit values
+  ltc6804_chat(RDCVA, 0, n_chain, cv_regs[0]);
+  ltc6804_chat(RDCVB, 0, n_chain, cv_regs[1]);
+  ltc6804_chat(RDCVC, 0, n_chain, cv_regs[2]);
+  ltc6804_chat(RDCVD, 0, n_chain, cv_regs[3]);
 
   float v_sum = 0;
   float v_min = INFINITY;
@@ -273,7 +285,7 @@ static int ltc6804_get_voltages(void) {
     char *p = s;
     p += sprintf(p, "Pack %d:\n", i);
     for (int j = 0; j < 12; j++) {
-      float v = cv_regs[j/3][i][j%3] * 100e-6;
+      float v = cv_regs[j/3][i].reg16[j%3] * 100e-6;
       v_sum += v;
       if (v < v_min)
         v_min = v;
@@ -294,31 +306,29 @@ static int ltc6804_get_voltages(void) {
   return mask;
 }
 
-static int ltc6804_get_temps(void) {
-  int n_chain = 1;
-
+int ltc6804_get_temps(int n_chain) {
   ltc6804_chat(ADAX | AD_MD10 | CHG_ALL, 0, n_chain, NULL);
   msleep(3);
-  u16 av_regs[3][CHAIN_MAX][3];  // Each chain has 3 register groups, each with 3 16-bit values
-  ltc6804_chat(RDAUXA, 0, n_chain, (u8 *)av_regs[0]);
-  ltc6804_chat(RDAUXB, 0, n_chain, (u8 *)av_regs[1]);
+  reg_group_t av_regs[3][CHAIN_MAX];  // Each chain has 4 register groups, each with 3 16-bit values
+  ltc6804_chat(RDAUXA, 0, n_chain, av_regs[0]);
+  ltc6804_chat(RDAUXB, 0, n_chain, av_regs[1]);
   ltc6804_wakeup();
   ltc6804_chat(ADSTAT | AD_MD10 | CHST_ITMP, 0, n_chain, NULL);
   msleep(1);
   ltc6804_wakeup();
-  ltc6804_chat(RDSTATA, 0, n_chain, (u8 *)av_regs[2]);
+  ltc6804_chat(RDSTATA, 0, n_chain, av_regs[2]);
 
   for (int i = 0; i < n_chain; i++) {
     char s[222];
     char *p = s;
     p += sprintf(p, "Pack %d Temps: ", i);
     for (int j = 0; j < 5; j++) {
-      float v = av_regs[j/3][i][j%3] * 100e-6;
+      float v = av_regs[j/3][i].reg16[j%3] * 100e-6;
       float r = 3.0*10e3 / v - 10e3;
       float t = 1/(1/(273.0+25) + 1/3428.0 * logf(r/10e3)) - 273;
       p += sprintf(p, "%.1f ", t);
     }
-    float t = av_regs[2][i][1] * 100e-6 / 7.5e-3 - 273;
+    float t = av_regs[2][i].reg16[1] * 100e-6 / 7.5e-3 - 273;
     p += sprintf(p, "%.1f", t);
     LOG_INFO("%s", s);
   }
@@ -326,19 +336,30 @@ static int ltc6804_get_temps(void) {
   return 0;
 }
 
-static void ltc6804_dischg(u16 mask, u8 led) {
+static void ltc6804_dischg(uint16_t mask, uint8_t led) {
   int n_chain = 1;
-  u8 cfgr[6] = {0xF0 | (led ? 0x00 : 0x08), // Enable GPIO1 pulldown to light LED
+  reg_group_t cfgr = {.reg8={
+      0xF0 | (led ? 0x00 : 0x08), // Enable GPIO1 pulldown to light LED
                 0, 0, 0, // Don't care about overvolt/undervolt flags
                 mask & 0x00FF,
-                (mask & 0x0F00) >> 8};
-  ltc6804_chat(WRCFG, 1, n_chain, cfgr);
+      (mask & 0x0F00) >> 8}};
+  ltc6804_chat(WRCFG, 1, n_chain, &cfgr);
 }
 
 
-void ltc6804_init(void) {
+int ltc6804_init(void) {
   init_PEC15_Table();
   ltc_spi_dma_setup();
+
+  // Probe to find out how many devices are in the chain
+  ltc6804_wakeup();
+  reg_group_t statb[CHAIN_MAX];
+  ltc6804_chat(RDSTATB, 0, CHAIN_MAX, statb);
+  int n_pec_ok = 0;
+  for (int i = 0; i < CHAIN_MAX; i++) {
+    n_pec_ok += statb[i].pec_ok;
+  }
+  return n_pec_ok;
 }
 
 
@@ -347,9 +368,9 @@ void ltc6804_demo() {
   lcd_textbox_prep(0, 0, 480, 83, LCD_BLACK); 
 
   ltc6804_wakeup();
-  ltc6804_get_temps();
+  ltc6804_get_temps(1);
   ltc6804_wakeup();
-  u16 mask = ltc6804_get_voltages();
+  uint16_t mask = ltc6804_get_voltages(1);
   ltc6804_wakeup();
   ltc6804_dischg(0x000,0);
   msleep(200);

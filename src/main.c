@@ -3,6 +3,7 @@
 #include "clock.h"
 #include "font.h"
 #include "gui.h"
+#include "gui_bat.h"
 #include "lcd.h"
 #include "leds.h"
 #include "ltc6804.h"
@@ -114,7 +115,7 @@ static void handle_sys(void) {
 int main(void)
 {
 	board_setup();
-        //ltc6804_init();
+        packs_talking = ltc6804_init();
 
         gui_setup();
         

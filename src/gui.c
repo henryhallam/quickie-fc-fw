@@ -148,6 +148,10 @@ static void gui_home_update(void) {
     gui_mc_draw_frame();
     gui_main_draw_frame();
     gui_bat_draw_frame();
+    lcd_textbox_prep(0, LCD_H - 40 , LCD_W, 40, LCD_DARKGREY);
+    lcd_printf(LCD_GREEN, &Roboto_Regular8pt7b, "ed is a line-oriented text editor.  It is used to\n"
+               "create, display, modify and otherwise manipulate text files.");
+    lcd_textbox_show();
     draw_buttons(buttons_home, DIM(buttons_home));
     gui.page_state = DRAW_LEFT;
     break;
@@ -184,7 +188,7 @@ static void update_fps(void) {
   frames++;
   uint32_t t = mtime();
   if (t - t_prev > 1000 && t_prev != 0) {
-    lcd_textbox_prep(0, LCD_H - 14, 80, 14, LCD_BLACK);
+    lcd_textbox_prep(0, 0, 50, 14, LCD_DARKGREY);
     lcd_printf(LCD_GREEN, &RobotoCondensed_Regular7pt7b, "%lu fps", frames * 1000 / (t - t_prev));
     lcd_textbox_show();
     frames = 0;

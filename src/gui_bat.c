@@ -11,6 +11,8 @@
 #define TITLE_W 52 // (GUI_MC_W * 0.36)
 #define DATA_W 46 //(GUI_MC_W * 0.32)
 
+int packs_talking = 0;
+
 int gui_bat_draw_frame(void) {
   if (GUI_BAT_X < 0 || GUI_BAT_Y < 0 || GUI_BAT_X + GUI_BAT_W > LCD_W || GUI_BAT_Y + GUI_BAT_H > LCD_H)
     return -1;
@@ -26,4 +28,11 @@ int gui_bat_draw_frame(void) {
 }
 
 void gui_bat_draw_data(void) {
+  lcd_textbox_prep(GUI_BAT_X + TITLE_W, GUI_BAT_Y + TITLE_H, GUI_BAT_W - TITLE_W, TITLE_H, LCD_DARKGREY);
+  lcd_printf(LCD_YELLOW, &DATA_FONT, "%d", packs_talking);
+  lcd_textbox_show();
+  
+  lcd_textbox_prep(0, LCD_H - 60, 480, 60, LCD_DARKGREY);
+  ltc6804_get_voltages(packs_talking);
+  lcd_textbox_show();
 }
