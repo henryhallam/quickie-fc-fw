@@ -31,7 +31,7 @@ CFLAGS		+= -O3
 # If your project is using a specific C standard you can set it by uncommenting
 # the following line and adjusting the -std flag accordingly
 #CFLAGS		+= -std=gnu11 -pedantic
-CFLAGS		+= -Wall -Werror -Wno-error=unused-function
+CFLAGS		+= -Wall -Werror -Wno-error=unused-function -Wno-error=unused-const-variable
 
 include ../libopencm3.target.mk
 

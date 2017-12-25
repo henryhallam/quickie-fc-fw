@@ -31,7 +31,8 @@
 // Monitor LV bus and emergency battery voltage also
 #define ADC_CH_BAT1 1
 #define ADC_CH_BAT2 2
-#define ADC_BAT_SCALE (((10E6 + 100E3) / 100E3) * 3.3 / 4095)  // Mistakenly populated 10M resistors instead of 1M - still works
+// Mistakenly populated 10M resistors instead of 1M - still works but a bit noisy
+#define ADC_BAT_SCALE (((10E6 + 100E3) / 100E3) * 3.3 / 4095)
 
 
 #define N_ADC_CONVS_BAT 2
@@ -68,8 +69,10 @@ static volatile uint16_t touch_raw_z = 0;
 static volatile uint16_t touch_raw_x = 0;
 static volatile uint16_t touch_raw_y = 0;
 
+static uint16_t adc_bat[2][7] = {0};
+static uint8_t adc_bat_index = 0;
 
-volatile int isr_count = 0;
+static volatile int isr_count = 0;
 
 
 static inline uint8_t setup_y(void) {
@@ -154,6 +157,14 @@ void dma2_stream0_isr(void)
     isr_count++;
     dma_clear_interrupt_flags(DMA2, DMA_STREAM0, DMA_TCIF);
 
+    /* Store the battery values in a 7-deep circular buffer.
+       They will be median-filtered in the readout. */
+    adc_bat[0][adc_bat_index] = adc_results[0];
+    adc_bat[1][adc_bat_index] = adc_results[1];
+    if (++adc_bat_index == 7)
+      adc_bat_index = 0;
+
+    // Take the median of the 7 repeated readings of the selected touch signal
     uint16_t median = opt_med7((uint16_t *)&adc_results[N_ADC_CONVS_BAT]);
     uint8_t next_ch;
     switch (touch_scan_state) {  // which measurement did we just take?
@@ -418,7 +429,13 @@ int touch_cal(void) {
   return 0;
 }
 
+float get_lv_bus_v(void) {
+  return opt_med7(adc_bat[0]) * ADC_BAT_SCALE;
+}
 
+float get_9v_v(void) {
+  return opt_med7(adc_bat[1]) * ADC_BAT_SCALE;
+}
 
 void touch_show_debug(void) {
   int t;

@@ -1,3 +1,8 @@
+/*
+  4-wire resistive touchscreen driver.
+  Interrupt driven. Uses ADC and DMA.
+  Somewhat confusingly, also monitors the low voltage batteries.
+ */
 #ifndef TOUCH_H
 #define TOUCH_H
 
@@ -11,7 +16,7 @@ typedef struct {
 void touch_setup(void);
 int touch_get(int *x, int *y);
 int touch_cal(void);
-void update_touch_filter(void);
-int touch_get_filtered(int *x, int *y);
 void touch_show_debug(void);
+float get_lv_bus_v(void);
+float get_9v_v(void);
 #endif // TOUCH_H

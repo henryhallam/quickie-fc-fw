@@ -13,7 +13,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
-
+#include <libopencm3/cm3/scb.h>
 
 /* Convention: To move to a new page:
    1. Clear the screen
@@ -22,7 +22,7 @@
 */
 
 typedef enum {
-  GUI_HOME, GUI_MENU, GUI_MSGS, GUI_DEBUG,
+  GUI_HOME, GUI_MENU, GUI_MSGS,
   GUI_N_PAGES
 } gui_page_e;
 
@@ -72,6 +72,7 @@ button_t buttons_home[] = {[BUTT_HOME_LMC] = {0, GUI_MC_H, GUI_MC_W / 2 + 1, 64,
                            [BUTT_HOME_MODE2] = {GUI_MC_W + GUI_MAIN_W, GUI_MC_H, GUI_BAT_W / 2 + 1, 64, LCD_GREY, "Chg", 0, 0},
                            [BUTT_HOME_MENU] = {GUI_MC_W + GUI_MAIN_W + GUI_BAT_W / 2, GUI_MC_H, GUI_BAT_W / 2, 64, LCD_GREY, "Menu", 0, 0},
 };
+
 
 static void draw_buttons(button_t *buttons, int n_buttons) {
   for (int i = 0; i < n_buttons; i++) {
@@ -148,10 +149,6 @@ static void gui_home_update(void) {
     gui_mc_draw_frame();
     gui_main_draw_frame();
     gui_bat_draw_frame();
-    lcd_textbox_prep(0, LCD_H - 40 , LCD_W, 40, LCD_DARKGREY);
-    lcd_printf(LCD_GREEN, &Roboto_Regular8pt7b, "ed is a line-oriented text editor.  It is used to\n"
-               "create, display, modify and otherwise manipulate text files.");
-    lcd_textbox_show();
     draw_buttons(buttons_home, DIM(buttons_home));
     gui.page_state = DRAW_LEFT;
     break;
@@ -165,6 +162,15 @@ static void gui_home_update(void) {
     break;
   case DRAW_RIGHT:
     gui_bat_draw_data();
+    gui.page_state = DRAW_BOTTOM;
+    break;
+  case DRAW_BOTTOM:
+    lcd_textbox_prep(0, LCD_H - 40 , LCD_W, 40, LCD_DARKGREY);
+    lcd_printf(LCD_GREEN, &Roboto_Regular8pt7b,
+	       "LV bus: %.1f V  Backup: %.1f V",
+	       get_lv_bus_v(), get_9v_v());
+    lcd_textbox_show();
+    gui.page_state = DRAW_LEFT;
     handle_buttons(buttons_home, DIM(buttons_home));
     if (buttons_home[BUTT_HOME_MODE1].clicked) {
       static bool toggle = 0;
@@ -174,11 +180,66 @@ static void gui_home_update(void) {
       buttons_home[BUTT_HOME_MODE1].bg_color = toggle ? LCD_RED : LCD_BLUE;
       draw_buttons(&buttons_home[BUTT_HOME_MODE1], 1);
     }
-    gui.page_state = DRAW_BOTTOM;
+    if (buttons_home[BUTT_HOME_MENU].clicked) {
+    gui.page = GUI_MENU;
+    gui.page_state = 0; // init
+    lcd_clear();
+    }
     break;
-  case DRAW_BOTTOM:
-    gui.page_state = DRAW_LEFT;
+  }
+}
+
+enum buttons_menu_e {
+  BUTT_MENU_HOME, BUTT_MENU_CAN, BUTT_MENU_TOUCH, BUTT_MENU_BATT, BUTT_MENU_REBOOT
+};
+button_t buttons_menu[] = {[BUTT_MENU_HOME] = {0, 20, LCD_W / 2, 64, LCD_BLUE, "Home", 0, 0},
+                           [BUTT_MENU_CAN] = {LCD_W/2, 20, LCD_W / 2, 64, LCD_GREY, "Debug CAN", 0, 0},
+                           [BUTT_MENU_TOUCH] = {0, 84, LCD_W / 2, 64, LCD_MEDIUMGREEN, "Touch Cal / Debug", 0, 0},
+                           [BUTT_MENU_BATT] = {LCD_W/2, 84, LCD_W / 2, 64, LCD_PURPLE, "Debug Batteries", 0, 0},
+                           [BUTT_MENU_REBOOT] = {0, 148, LCD_W / 2, 64, LCD_RED, "Reboot", 0, 0},
+};
+
+static void gui_menu_update(void) {
+  static bool debug_touch = 0;
+  enum gui_menu_state { INIT = 0, WAIT = 1 };
+  switch (gui.page_state) {
+  case INIT:
+    lcd_textbox_prep(0, 0 , LCD_W, 20, LCD_BLACK);
+    lcd_printf(LCD_WHITE, &Roboto_Regular8pt7b, "Main menu");
+    lcd_textbox_show();
+    draw_buttons(buttons_menu, DIM(buttons_menu));
+    gui.page_state = WAIT;
     break;
+  case WAIT:
+    break;
+  }
+  handle_buttons(buttons_menu, DIM(buttons_menu));
+  if (buttons_menu[BUTT_MENU_HOME].clicked) {
+    gui.page = GUI_HOME; gui.page_state = 0; lcd_clear();
+  }
+  if (buttons_menu[BUTT_MENU_CAN].clicked) {
+    lcd_clear();
+    while (!touch_get(NULL, NULL))
+      can_show_debug();
+    gui.page = GUI_HOME; gui.page_state = 0; lcd_clear();
+    while (touch_get(NULL, NULL));
+  }
+  if (buttons_menu[BUTT_MENU_TOUCH].clicked) {
+    // Dual-purpose button: Do a touch cal, also toggle showing a line of touch debug info (this page only)
+    debug_touch = !debug_touch;
+    touch_cal();
+    gui.page_state = INIT; // need to redraw
+  }
+  if (buttons_menu[BUTT_MENU_BATT].clicked) {
+  }
+  if (buttons_menu[BUTT_MENU_REBOOT].clicked)
+    scb_reset_system();
+  if (debug_touch) {
+    touch_show_debug();
+    // Redraw menu every so often
+    static uint8_t redraw_ctr = 0;
+    if (redraw_ctr++ == 0)
+      gui.page_state = INIT;
   }
 }
 
@@ -202,9 +263,8 @@ void gui_update(void) {
   case GUI_HOME:
     gui_home_update();
     break;
-  case GUI_DEBUG:
-    //    touch_show_debug();
-    //    can_show_debug();
+  case GUI_MENU:
+    gui_menu_update();
     break;
   default:
     // invalid state - reset to home

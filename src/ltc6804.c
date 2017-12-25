@@ -283,7 +283,7 @@ int ltc6804_get_voltages(int n_chain) {
   for (int i = 0; i < n_chain; i++) {
     char s[222];
     char *p = s;
-    p += sprintf(p, "Pack %d:\n", i);
+    p += sprintf(p, "Pack %d: ", i);
     for (int j = 0; j < 12; j++) {
       float v = cv_regs[j/3][i].reg16[j%3] * 100e-6;
       v_sum += v;
@@ -298,10 +298,11 @@ int ltc6804_get_voltages(int n_chain) {
         mask |= 1<<j;
         
     }
-    LOG_INFO("%s", s);
+    //    LOG_INFO("%s", s);
   }
-  LOG_INFO("Sum = %.3f   Min, Mean, Max = %.3f, %.3f, %.3f",
+  /*  LOG_INFO("Sum = %.3f   Min, Mean, Max = %.3f, %.3f, %.3f",
            v_sum, v_min, v_sum/(12*n_chain), v_max);
+  */
 
   return mask;
 }
