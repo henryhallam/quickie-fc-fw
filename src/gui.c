@@ -45,6 +45,8 @@ void gui_setup(void) {
         */
 }
 
+int bringup_button_pressed, bringup_dirty;
+
 
 #define DIM(arr) (sizeof(arr) / sizeof(arr[0]))
 
@@ -172,14 +174,34 @@ static void gui_home_update(void) {
     lcd_textbox_show();
     gui.page_state = DRAW_LEFT;
     handle_buttons(buttons_home, DIM(buttons_home));
+
     if (buttons_home[BUTT_HOME_MODE1].clicked) {
-      static bool toggle = 0;
-      toggle = !toggle;
-      relay_ctl(RLY_PRECHG, toggle);
-      buttons_home[BUTT_HOME_MODE1].caption = toggle ? "Stop" : "Start";
-      buttons_home[BUTT_HOME_MODE1].bg_color = toggle ? LCD_RED : LCD_BLUE;
-      draw_buttons(&buttons_home[BUTT_HOME_MODE1], 1);
+      bringup_button_pressed = 1;
     }
+
+    switch(bringup.stage) {
+	    case SYS_OFF:
+		    buttons_home[BUTT_HOME_MODE1].caption = "START";
+		    break;
+	    case SYS_PRECHG_1:
+		    buttons_home[BUTT_HOME_MODE1].caption = bringup.ok ? "PRE 1" : "FAIL1";
+		    break;
+	    case SYS_PRECHG_2:
+		    buttons_home[BUTT_HOME_MODE1].caption = bringup.ok ? "PRE 2" : "FAIL2";
+		    break;
+	    case SYS_ON:
+		    buttons_home[BUTT_HOME_MODE1].caption = bringup.ok ? "STOP" : "FAULT";
+		    break;
+	    case SYS_COOLDOWN:
+		    buttons_home[BUTT_HOME_MODE1].caption = bringup.ok ? "RESTART" : "FAULT";
+		    break;
+    }
+
+    if (bringup_dirty == 1) {
+      draw_buttons(&buttons_home[BUTT_HOME_MODE1], 1);
+      bringup_dirty = 0;
+    }
+
     if (buttons_home[BUTT_HOME_MENU].clicked) {
     gui.page = GUI_MENU;
     gui.page_state = 0; // init
