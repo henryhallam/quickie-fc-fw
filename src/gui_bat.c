@@ -1,3 +1,12 @@
+/* Battery GUI
+ Ideas:
+  - Translucent histogram behind text
+  - Separate full-page histogram
+  - Quick ID of out-of-family packs
+    - Text description
+    - Aircraft schematic
+  - Internal resistance calculation, compensation and reporting
+ */
 #include "gui_bat.h"
 #include "lcd.h"
 #include "font.h"
@@ -197,4 +206,19 @@ void gui_bat_draw_data(void) {
   }
   
   //  lcd_textbox_show();
+}
+
+
+void debug_bat() {
+
+  lcd_textbox_prep(0, 0, 480, 83, LCD_BLACK); 
+
+  //  ltc6804_wakeup();
+  ltc6804_get_voltages(packs_talking);
+  lcd_textbox_show();
+  /*
+  ltc6804_chat(2, 0, 1, regs);
+  LOG_INFO("response = %02X %02X %02X %02X %02X %02X",
+           regs[0], regs[1], regs[2], regs[3], regs[4], regs[5]);
+  */
 }

@@ -253,6 +253,11 @@ static void gui_menu_update(void) {
     gui.page_state = INIT; // need to redraw
   }
   if (buttons_menu[BUTT_MENU_BATT].clicked) {
+    lcd_clear();
+    debug_bat();
+    msleep(4000);
+    gui.page_state = INIT;
+    lcd_clear();
   }
   if (buttons_menu[BUTT_MENU_REBOOT].clicked)
     scb_reset_system();

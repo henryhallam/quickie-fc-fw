@@ -265,7 +265,6 @@ static void lightup_chain(uint8_t mask) {
 */
 
 int ltc6804_get_voltages(int n_chain) {
-  uint16_t mask = 0;
   ltc6804_wakeup();
 
   ltc6804_chat(ADCV | AD_MD10 | CH_ALL, 0, n_chain, NULL);
@@ -293,18 +292,14 @@ int ltc6804_get_voltages(int n_chain) {
         v_max = v;
       p += sprintf(p, "%.3f ", v);
 
-      // Crappy autobalance
-      if (v > V_TARGET)
-        mask |= 1<<j;
-        
     }
-    //    LOG_INFO("%s", s);
+    LOG_INFO("%s", s);
   }
-  /*  LOG_INFO("Sum = %.3f   Min, Mean, Max = %.3f, %.3f, %.3f",
+    LOG_INFO("Sum = %.3f   Min, Mean, Max = %.3f, %.3f, %.3f",
            v_sum, v_min, v_sum/(12*n_chain), v_max);
-  */
 
-  return mask;
+
+  return 0;
 }
 
 int ltc6804_get_temps(int n_chain) {
@@ -364,27 +359,3 @@ int ltc6804_init(void) {
 }
 
 
-void ltc6804_demo() {
-
-  lcd_textbox_prep(0, 0, 480, 83, LCD_BLACK); 
-
-  ltc6804_wakeup();
-  ltc6804_get_temps(1);
-  ltc6804_wakeup();
-  uint16_t mask = ltc6804_get_voltages(1);
-  ltc6804_wakeup();
-  ltc6804_dischg(0x000,0);
-  msleep(200);
-  ltc6804_wakeup();
-  LOG_INFO("Discharge: 0x%03X", mask);
-  if (mask)
-    ltc6804_dischg(mask, 1);
-  msleep(500);
-
-  lcd_textbox_show();
-  /*
-  ltc6804_chat(2, 0, 1, regs);
-  LOG_INFO("response = %02X %02X %02X %02X %02X %02X",
-           regs[0], regs[1], regs[2], regs[3], regs[4], regs[5]);
-  */
-}
