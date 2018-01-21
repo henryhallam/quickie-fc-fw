@@ -22,9 +22,10 @@ enum bringup_stage { SYS_OFF, SYS_PRECHG_1, SYS_PRECHG_2, SYS_ON, SYS_COOLDOWN }
 extern int bringup_dirty, bringup_button_pressed;
 
 extern struct bringup_ctx {
-        enum bringup_stage stage;
-	int                ok;
-	uint32_t           mtime_last;
+    enum bringup_stage  current_stage;
+    int                 failed;
+    enum bringup_stage  failed_stage;
+    uint32_t            mtime_last;
 } bringup;
 
 #endif //BOARD_H

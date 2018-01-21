@@ -20,11 +20,15 @@
 
 struct bringup_ctx bringup;
 
-static void advance(struct bringup_ctx *ctx, enum bringup_stage new_stage, int ok) {
-	ctx->stage         = new_stage;
-	ctx->ok            = ok;
-	ctx->mtime_last    = mtime();
-	bringup_dirty = 1;
+static void advance(struct bringup_ctx *ctx, enum bringup_stage new_stage, int status) {
+    if (status == NG) {
+        ctx->failed_stage = ctx->current_stage;
+    }
+    ctx->current_stage          = new_stage;
+    ctx->failed                 = status;
+    ctx->mtime_last             = mtime();
+
+    bringup_dirty = 1;
 }
 
 static void handle_sys(void) {
