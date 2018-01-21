@@ -17,6 +17,7 @@
 #define OK 1
 #define NG 0
 
+#define BUS_VOLTAGE_GOOD (40.0)
 
 struct bringup_ctx bringup;
 
@@ -48,7 +49,7 @@ static void handle_sys(void) {
     relay_ctl(RLY_FW_R,   0);
 
     if (mtime() - mc_telem[MC_RIGHT].mtime_rx < 100
-        && mc_telem[MC_RIGHT].bus_v > 300.0) {
+        && mc_telem[MC_RIGHT].bus_v > BUS_VOLTAGE_GOOD) {
       advance(&bringup, SYS_PRECHG_2, OK);
     }
 
@@ -64,7 +65,7 @@ static void handle_sys(void) {
 
     if (mtime() - bringup.mtime_last > 50 // ensure main contactor has time to close
         && mtime() - mc_telem[MC_RIGHT].mtime_rx < 100  // recent data
-        && mc_telem[MC_RIGHT].bus_v > 300.0) {
+        && mc_telem[MC_RIGHT].bus_v > BUS_VOLTAGE_GOOD) {          // bus still hot
       advance(&bringup, SYS_ON, OK);
     }
 
@@ -80,8 +81,8 @@ static void handle_sys(void) {
   case SYS_ON:
     relay_ctl(RLY_PRECHG, 0);
     relay_ctl(RLY_FW_R,   1);
-    if ( mtime() - mc_telem[MC_RIGHT].mtime_rx > 100  // or lost comm
-        || mc_telem[MC_RIGHT].bus_v < 300.0) {  // or low voltage
+    if ( mtime() - mc_telem[MC_RIGHT].mtime_rx > 100        // lost comm
+        || mc_telem[MC_RIGHT].bus_v < BUS_VOLTAGE_GOOD) {   // or low voltage
 	    advance(&bringup, SYS_COOLDOWN, NG);
     }
     if(bringup_button_pressed == 1) {
@@ -95,7 +96,7 @@ static void handle_sys(void) {
     relay_ctl(RLY_PRECHG, 0);
     relay_ctl(RLY_FW_R,   0);
     if (mtime() - bringup.mtime_last > 1500) {
-      advance(&bringup, SYS_OFF, OK);
+      advance(&bringup, SYS_OFF, bringup.ok);
     }
     break;
   }
