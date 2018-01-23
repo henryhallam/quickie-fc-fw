@@ -11,9 +11,11 @@
 #include "gui_fun.h"
 #include "touch.h"
 #include <stdint.h>
+#include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
 #include <libopencm3/cm3/scb.h>
+#include <libopencm3/stm32/can.h>
 
 /* Convention: To move to a new page:
    1. Clear the screen
@@ -169,8 +171,9 @@ static void gui_home_update(void) {
   case DRAW_BOTTOM:
     lcd_textbox_prep(0, LCD_H - 40 , LCD_W, 40, LCD_DARKGREY);
     lcd_printf(LCD_GREEN, &Roboto_Regular8pt7b,
-	       "LV bus: %.1f V  Backup: %.1f V",
-	       get_lv_bus_v(), get_9v_v());
+	       "CAN_ESR 0x%lx  V CRMI %d",
+	       CAN_ESR(CAN1), can_rx_max_interval);
+
     lcd_textbox_show();
     gui.page_state = DRAW_LEFT;
     handle_buttons(buttons_home, DIM(buttons_home));
@@ -207,12 +210,13 @@ button_t buttons_menu[] = {[BUTT_MENU_HOME] = {0, 20, LCD_W / 2, 64, LCD_BLUE, "
 };
 
 static void gui_menu_update(void) {
+    msleep(10);
   static bool debug_touch = 0;
   enum gui_menu_state { INIT = 0, WAIT = 1 };
   switch (gui.page_state) {
   case INIT:
     lcd_textbox_prep(0, 0 , LCD_W, 20, LCD_BLACK);
-    lcd_printf(LCD_WHITE, &Roboto_Regular8pt7b, "Main menu");
+    lcd_printf(LCD_WHITE, &Roboto_Regular8pt7b, "Main menu CAN_ESR 0x%lx, CRMI %d",  CAN_ESR(CAN1), can_rx_max_interval);
     lcd_textbox_show();
     draw_buttons(buttons_menu, DIM(buttons_menu));
     gui.page_state = WAIT;
