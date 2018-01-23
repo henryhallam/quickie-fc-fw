@@ -169,15 +169,44 @@ static void handle_sys(void) {
   case SYS_COOLDOWN:
     relay_ctl(RLY_PRECHG, 0);
     relay_ctl(RLY_FW_R,   0);
-    if (mtime() - bringup.mtime_last > 1500) {
-      advance(&bringup, SYS_OFF, bringup.ok);
+    relay_ctl(RLY_FW_L,   0);
+
+    if (mtime() - bringup.mtime_last_transition > 1500) {
+      advance(&bringup, SYS_OFF, PROPAGATE);
     }
     break;
   }
 
 }
 
+struct motor_command_t {
+    uint8_t     enable;
+    uint8_t     speedctrl;
+    uint16_t    PAD16;
+    float       command_ref;
+};
 
+
+
+void can_torque_r(int enable, float torque) {
+    struct motor_command_t foo;
+    foo.enable = enable;
+    foo.speedctrl = 0;
+    foo.PAD16 = 0xbeef;
+    foo.command_ref = torque;
+    can_transmit(CAN1, 0x211, 0, 0, 8, (uint8_t *) &foo);
+
+}
+
+void can_torque_l(int enable, float torque) {
+    struct motor_command_t foo;
+    foo.enable = enable;
+    foo.speedctrl = 0;
+    foo.PAD16 = 0xbeef;
+    foo.command_ref = torque;
+    can_transmit(CAN1, 0x210, 0, 0, 8, (uint8_t *) &foo);
+
+}
 
 int main(void)
 {
@@ -185,9 +214,17 @@ int main(void)
         packs_talking = ltc6804_init();
 
         gui_setup();
-        
 	while (1) {
+        if (mtime() % 1000 < 500) {
+        led_set(LED_BATT_L,LED_RED);
+        led_set(LED_BATT_R,LED_GREEN);
+        } else {
+            led_set(LED_BATT_L, LED_GREEN);
+            led_set(LED_BATT_R, LED_YELLOW);
+        }
+
           can_process_rx();
+//          can_hello_world();
           handle_sys();
           gui_update();
 	}
