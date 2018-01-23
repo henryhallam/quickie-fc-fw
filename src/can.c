@@ -10,6 +10,8 @@
 
 volatile can_stats_t can_stats;
 
+int can_rx_max_interval = 0;
+
 #define N_RX_SW_MAILBOX 6
 
 #define CAN_ID_SIC_L 0x12
@@ -134,21 +136,42 @@ void can_show_debug(void) {
   }
 }
 
+
+static void crmi(void) {
+    static int lastrx = 0;
+    if (lastrx == 0) {
+        lastrx = mtime();
+    }
+
+    int delta = mtime() - lastrx;
+    lastrx = mtime();
+    if(delta > can_rx_max_interval) {
+        can_rx_max_interval = delta;
+    }
+}
+
+
+
 void can_process_rx(void) {
+
   // Called from the main loop to dispatch the various handlers
   for (int i = 0; i < N_RX_SW_MAILBOX; i++) {
     if (can_sw_mbx[i].full) {
       switch(i) {
       case SW_MBX_PDO1_L:
+          crmi();
         mc_telem_parse_pdo1(can_sw_mbx[i].data, MC_LEFT);
         break;
       case SW_MBX_PDO2_L:
+          crmi();
         mc_telem_parse_pdo2(can_sw_mbx[i].data, MC_LEFT);
         break;
       case SW_MBX_PDO1_R:
+          crmi();
         mc_telem_parse_pdo1(can_sw_mbx[i].data, MC_RIGHT);
         break;
       case SW_MBX_PDO2_R:
+          crmi();
         mc_telem_parse_pdo2(can_sw_mbx[i].data, MC_RIGHT);
         break;
       }
