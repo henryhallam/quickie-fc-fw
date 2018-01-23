@@ -179,25 +179,10 @@ static void gui_home_update(void) {
       bringup_button_pressed = 1;
     }
 
-    switch(bringup.stage) {
-	    case SYS_OFF:
-		    buttons_home[BUTT_HOME_MODE1].caption = "START";
-		    break;
-	    case SYS_PRECHG_1:
-		    buttons_home[BUTT_HOME_MODE1].caption = bringup.ok ? "PRE 1" : "FAIL1";
-		    break;
-	    case SYS_PRECHG_2:
-		    buttons_home[BUTT_HOME_MODE1].caption = bringup.ok ? "PRE 2" : "FAIL2";
-		    break;
-	    case SYS_ON:
-		    buttons_home[BUTT_HOME_MODE1].caption = bringup.ok ? "STOP" : "FAULT";
-		    break;
-	    case SYS_COOLDOWN:
-		    buttons_home[BUTT_HOME_MODE1].caption = bringup.ok ? "RESTART" : "FAULT";
-		    break;
-    }
+
 
     if (bringup_dirty == 1) {
+        buttons_home[BUTT_HOME_MODE1].caption = bringup_ctx_string(&bringup);
       draw_buttons(&buttons_home[BUTT_HOME_MODE1], 1);
       bringup_dirty = 0;
     }
