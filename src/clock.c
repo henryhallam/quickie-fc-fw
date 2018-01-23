@@ -91,8 +91,9 @@ void clock_setup(void)
 	/* Base board frequency (AHB), set to 168MHz.  APB1 = 42 MHz, APB2 = 84 MHz. */
 	rcc_clock_setup_hse_3v3(&rcc_hse_25mhz_3v3[RCC_CLOCK_3V3_168MHZ]);
         
-	systick_set_reload(systick_reload);
 	systick_set_clocksource(STK_CSR_CLKSOURCE_AHB);
+    STK_CVR = 0;
+	systick_set_reload(systick_reload);
 	systick_counter_enable();
 
 	/* this done last */
