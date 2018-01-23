@@ -23,8 +23,11 @@
    3. Set gui.page_state = 0 - this is INIT for all pages.
 */
 
+
+extern int can_rx_max_interval;
+
 typedef enum {
-  GUI_HOME, GUI_MENU, GUI_MSGS,
+  GUI_HOME, GUI_MENU, GUI_MSGS, GUI_RMC,
   GUI_N_PAGES
 } gui_page_e;
 
@@ -92,7 +95,7 @@ static void draw_buttons(button_t *buttons, int n_buttons) {
     int text_y = (butt->h - text_h) / 2 + 3;
     lcd_textbox_move_cursor(text_x, text_y, 0);
     lcd_printf(BUTTON_COLOR_TEXT, &BUTTON_FONT, "%s", butt->caption);
-    
+
     // Draw border
     for (int x = 0; x < butt->w; x++) {
       fb[x] = BUTTON_COLOR_BORDER;
@@ -195,6 +198,14 @@ static void gui_home_update(void) {
     gui.page_state = 0; // init
     lcd_clear();
     }
+
+    if (buttons_home[BUTT_HOME_RMC].clicked) {
+        gui.page = GUI_RMC;
+        gui.page_state = 0;
+        lcd_clear();
+    }
+
+
     break;
   }
 }
@@ -259,6 +270,78 @@ static void gui_menu_update(void) {
   }
 }
 
+enum buttons_rmc_e {
+  BUTT_RMC_KILL, BUTT_RMC_ZERO, BUTT_RMC_INCREASE, BUTT_RMC_DECREASE, BUTT_RMC_ENABLE, BUTT_RMC_DISABLE, BUTT_RMC_HOME
+};
+button_t buttons_rmc[] = { [BUTT_RMC_KILL] =        {0,          20, LCD_W,     48, LCD_RED,    "EMERGENCY STOP", 0, 0},
+                           [BUTT_RMC_ZERO] =        {0,          80, LCD_W,     32, LCD_BLUE,   "ZERO TORQUE", 0, 0},
+                           [BUTT_RMC_DECREASE] =    {0,         130, LCD_W / 2, 32, LCD_PURPLE, "DECREASE", 0, 0},
+                           [BUTT_RMC_INCREASE] =    {LCD_W/2,   130, LCD_W / 2, 32, LCD_PURPLE, "INCREASE", 0, 0},
+                           [BUTT_RMC_ENABLE]   =    {0,         180, LCD_W / 2, 32, LCD_PURPLE, "ENABLE", 0, 0},
+                           [BUTT_RMC_DISABLE]  =    {LCD_W/2,   180, LCD_W / 2, 32, LCD_PURPLE, "DISABLE", 0, 0},
+                           [BUTT_RMC_HOME] =        {LCD_W/4,   240, LCD_W / 2, 32, LCD_PURPLE, "HOME", 0, 0},
+};
+static void gui_rmc_update(void) {
+    static float torque_req = 0.0;
+    static uint8_t enabled = 0;
+
+    switch (gui.page_state) {
+        case 0:
+            draw_buttons(buttons_rmc, DIM(buttons_rmc));
+            gui.page_state = 1;
+            break;
+
+        case 1:
+            lcd_textbox_prep(0, 0, LCD_W, 20, LCD_BLACK);
+            lcd_printf(LCD_WHITE, &Roboto_Regular8pt7b, "Right motor controller throttle, torque = %f, enabled = %d", torque_req, enabled);
+            lcd_textbox_show();
+            break;
+    }
+
+    handle_buttons(buttons_rmc, DIM(buttons_rmc));
+
+    if (buttons_rmc[BUTT_RMC_KILL].clicked) {
+        enabled = 0;
+        torque_req = 0.0;
+        can_torque_r(enabled, torque_req);
+        raise_fault();
+    }
+    if (buttons_rmc[BUTT_RMC_HOME].clicked) {
+        gui.page = GUI_HOME; gui.page_state = 0; lcd_clear();
+    }
+    if (buttons_rmc[BUTT_RMC_ZERO].clicked) {
+        torque_req = 0.0;
+    }
+    if (buttons_rmc[BUTT_RMC_ENABLE].clicked) {
+        enabled = 1;
+    }
+
+    if (buttons_rmc[BUTT_RMC_DISABLE].clicked) {
+        enabled = 0;
+    }
+
+    if (buttons_rmc[BUTT_RMC_DECREASE].clicked) {
+        torque_req     -= 0.2;
+        if (torque_req < -2.0) {
+            torque_req = -2.0;
+        }
+    }
+
+    if (buttons_rmc[BUTT_RMC_INCREASE].clicked) {
+        torque_req +=    0.2;
+        if (torque_req > 2.0) {
+            torque_req = 2.0;
+        }
+    }
+    can_torque_r(enabled, torque_req);
+
+
+
+
+}
+
+
+
 static void update_fps(void) {
   static uint32_t t_prev = 0;
   static int frames = 0;
@@ -281,6 +364,9 @@ void gui_update(void) {
     break;
   case GUI_MENU:
     gui_menu_update();
+    break;
+  case GUI_RMC:
+    gui_rmc_update();
     break;
   default:
     // invalid state - reset to home
