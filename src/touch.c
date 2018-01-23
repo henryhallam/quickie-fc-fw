@@ -196,6 +196,7 @@ void dma2_stream0_isr(void)
       touch_raw_x = y;  // swap X and Y due to panel rotation
       touch_raw_y = x;
       touch_raw_z = z;
+      /* FALLTHROUGH */
     default:
       next_ch = setup_z();
       touch_scan_state = TOUCH_SCAN_Z1;
