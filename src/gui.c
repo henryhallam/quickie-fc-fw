@@ -271,19 +271,33 @@ static void gui_menu_update(void) {
 }
 
 enum buttons_rmc_e {
-  BUTT_RMC_KILL, BUTT_RMC_ZERO, BUTT_RMC_INCREASE, BUTT_RMC_DECREASE, BUTT_RMC_ENABLE, BUTT_RMC_DISABLE, BUTT_RMC_HOME
+  BUTT_RMC_KILL, BUTT_RMC_ZERO, 
+  BUTT_RMC_INCREASE, BUTT_RMC_DECREASE, BUTT_RMC_ENABLE, BUTT_RMC_DISABLE, BUTT_RMC_HOME,
+  BUTT_LMC_INCREASE, BUTT_LMC_DECREASE, BUTT_LMC_ENABLE, BUTT_LMC_DISABLE
 };
 button_t buttons_rmc[] = { [BUTT_RMC_KILL] =        {0,          20, LCD_W,     48, LCD_RED,    "EMERGENCY STOP", 0, 0},
                            [BUTT_RMC_ZERO] =        {0,          80, LCD_W,     32, LCD_BLUE,   "ZERO TORQUE", 0, 0},
-                           [BUTT_RMC_DECREASE] =    {0,         130, LCD_W / 2, 32, LCD_PURPLE, "DECREASE", 0, 0},
-                           [BUTT_RMC_INCREASE] =    {LCD_W/2,   130, LCD_W / 2, 32, LCD_PURPLE, "INCREASE", 0, 0},
-                           [BUTT_RMC_ENABLE]   =    {0,         180, LCD_W / 2, 32, LCD_PURPLE, "ENABLE", 0, 0},
-                           [BUTT_RMC_DISABLE]  =    {LCD_W/2,   180, LCD_W / 2, 32, LCD_PURPLE, "DISABLE", 0, 0},
+                           [BUTT_RMC_DECREASE] =    {2*LCD_W/4, 130, LCD_W / 4, 32, LCD_PURPLE, "DECREASE R", 0, 0},
+                           [BUTT_RMC_INCREASE] =    {3*LCD_W/4, 130, LCD_W / 4, 32, LCD_PURPLE, "INCREASE R", 0, 0},
+                           [BUTT_RMC_ENABLE]   =    {3*LCD_W/4, 180, LCD_W / 4, 32, LCD_PURPLE, "ENABLE R", 0, 0},
+                           [BUTT_RMC_DISABLE]  =    {LCD_W/2,   180, LCD_W / 4, 32, LCD_PURPLE, "DISABLE R", 0, 0},
+
+                           [BUTT_LMC_DECREASE] =    {0,         130, LCD_W / 4, 32, LCD_PURPLE, "DECREASE L", 0, 0},
+                           [BUTT_LMC_INCREASE] =    {1*LCD_W/4, 130, LCD_W / 4, 32, LCD_PURPLE, "INCREASE L", 0, 0},
+                           [BUTT_LMC_ENABLE]   =    {0,         180, LCD_W / 4, 32, LCD_PURPLE, "ENABLE L", 0, 0},
+                           [BUTT_LMC_DISABLE]  =    {1*LCD_W/4, 180, LCD_W / 4, 32, LCD_PURPLE, "DISABLE L", 0, 0},
+
+
                            [BUTT_RMC_HOME] =        {LCD_W/4,   240, LCD_W / 2, 32, LCD_PURPLE, "HOME", 0, 0},
 };
+
+
+#define ILIMIT 10.0
 static void gui_rmc_update(void) {
-    static float torque_req = 0.0;
-    static uint8_t enabled = 0;
+    static float torque_l = 0.0;
+    static float torque_r = 0.0;
+    static uint8_t enabled_l = 0;
+    static uint8_t enabled_r = 0;
 
     switch (gui.page_state) {
         case 0:
@@ -293,7 +307,7 @@ static void gui_rmc_update(void) {
 
         case 1:
             lcd_textbox_prep(0, 0, LCD_W, 20, LCD_BLACK);
-            lcd_printf(LCD_WHITE, &Roboto_Regular8pt7b, "Right motor controller throttle, torque = %f, enabled = %d", torque_req, enabled);
+            lcd_printf(LCD_WHITE, &Roboto_Regular8pt7b, "T_right = %f, EN_right = %d T_left = %f, EN_left = %d", torque_r, enabled_r, torque_l, enabled_l);
             lcd_textbox_show();
             break;
     }
@@ -301,41 +315,68 @@ static void gui_rmc_update(void) {
     handle_buttons(buttons_rmc, DIM(buttons_rmc));
 
     if (buttons_rmc[BUTT_RMC_KILL].clicked) {
-        enabled = 0;
-        torque_req = 0.0;
-        can_torque_r(enabled, torque_req);
+        enabled_l = 0;
+        enabled_r = 0;
+        torque_r = 0.0;
+        torque_l = 0.0;
+        can_torque_r(enabled_r, torque_r);
+        can_torque_l(enabled_l, torque_l);
         raise_fault();
     }
     if (buttons_rmc[BUTT_RMC_HOME].clicked) {
         gui.page = GUI_HOME; gui.page_state = 0; lcd_clear();
     }
     if (buttons_rmc[BUTT_RMC_ZERO].clicked) {
-        torque_req = 0.0;
+        torque_l = 0.0;
+        torque_r = 0.0;
     }
     if (buttons_rmc[BUTT_RMC_ENABLE].clicked) {
-        enabled = 1;
+        enabled_r = 1;
     }
 
     if (buttons_rmc[BUTT_RMC_DISABLE].clicked) {
-        enabled = 0;
+        enabled_r = 0;
     }
 
     if (buttons_rmc[BUTT_RMC_DECREASE].clicked) {
-        torque_req     -= 0.2;
-        if (torque_req < -2.0) {
-            torque_req = -2.0;
+        torque_r     -= 0.2;
+        if (torque_r < -ILIMIT) {
+            torque_r = -ILIMIT;
         }
     }
 
     if (buttons_rmc[BUTT_RMC_INCREASE].clicked) {
-        torque_req +=    0.2;
-        if (torque_req > 2.0) {
-            torque_req = 2.0;
+        torque_r +=    0.2;
+        if (torque_r > ILIMIT) {
+            torque_r = ILIMIT; 
         }
     }
-    can_torque_r(enabled, torque_req);
+
+    if (buttons_rmc[BUTT_LMC_ENABLE].clicked) {
+        enabled_l = 1;
+    }
+
+    if (buttons_rmc[BUTT_LMC_DISABLE].clicked) {
+        enabled_l = 0;
+    }
+
+    if (buttons_rmc[BUTT_LMC_DECREASE].clicked) {
+        torque_l     -= 0.2;
+        if (torque_l < -ILIMIT) {
+            torque_l = -ILIMIT;
+        }
+    }
+
+    if (buttons_rmc[BUTT_LMC_INCREASE].clicked) {
+        torque_l +=    0.2;
+        if (torque_l > ILIMIT) {
+            torque_l = ILIMIT;
+        }
+    }
 
 
+    can_torque_r(enabled_r, torque_r);
+    can_torque_l(enabled_l, torque_l);
 
 
 }

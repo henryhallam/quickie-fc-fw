@@ -204,7 +204,7 @@ void can_torque_l(int enable, float torque) {
     foo.speedctrl = 0;
     foo.PAD16 = 0xbeef;
     foo.command_ref = torque;
-    can_transmit(CAN1, 0x210, 0, 0, 8, (uint8_t *) &foo);
+    can_transmit(CAN1, 0x212, 0, 0, 8, (uint8_t *) &foo);
 
 }
 
