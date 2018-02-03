@@ -8,7 +8,7 @@
 #include "usb.h"
 
 static usbd_device * usb_port;
-static int usb_on = 0;
+int usb_on = 0;
 
 static const struct usb_device_descriptor dev = {
 	.bLength = USB_DT_DEVICE_SIZE,
