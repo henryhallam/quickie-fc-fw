@@ -191,6 +191,10 @@ void can_process_rx(void) {
           crmi();
         mc_telem_parse_pdo2(can_sw_mbx[i].data, MC_LEFT);
         break;
+      case SW_MBX_PDO3_L:
+          crmi();
+        mc_telem_parse_pdo3(can_sw_mbx[i].data, MC_LEFT);
+        break;
       case SW_MBX_PDO1_R:
           crmi();
         mc_telem_parse_pdo1(can_sw_mbx[i].data, MC_RIGHT);
@@ -198,6 +202,10 @@ void can_process_rx(void) {
       case SW_MBX_PDO2_R:
           crmi();
         mc_telem_parse_pdo2(can_sw_mbx[i].data, MC_RIGHT);
+        break;
+      case SW_MBX_PDO3_R:
+          crmi();
+        mc_telem_parse_pdo3(can_sw_mbx[i].data, MC_RIGHT);
         break;
       }
       can_sw_mbx[i].full = 0;
