@@ -3,9 +3,12 @@
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/gpio.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include "clock.h"
 #include "usb.h"
 
 static usbd_device * usb_port;
+static int usb_on = 0;
 
 static const struct usb_device_descriptor dev = {
 	.bLength = USB_DT_DEVICE_SIZE,
@@ -180,14 +183,7 @@ static int cdcacm_control_request(usbd_device *usbd_dev,
 static void cdcacm_data_rx_cb(usbd_device *usbd_dev, uint8_t ep)
 {
 	(void)ep;
-
-	char buf[64];
-	int len = usbd_ep_read_packet(usbd_dev, 0x01, buf, 64);
-
-	if (len) {
-		gpio_toggle(GPIOA, GPIO8);
-	while(	usbd_ep_write_packet(usbd_dev, 0x82, "hello world", 12) == 0);
-	}
+	(void)usbd_dev;
 }
 
 static void cdcacm_set_config(usbd_device *usbd_dev, uint16_t wValue)
@@ -209,16 +205,57 @@ static void cdcacm_set_config(usbd_device *usbd_dev, uint16_t wValue)
 
 
 void usb_setup(void) {
-    rcc_periph_clock_enable(RCC_OTGFS);
+    if (usb_on == 0) {
+        rcc_periph_clock_enable(RCC_OTGFS);
 
-	usb_port = usbd_init(&otgfs_usb_driver, &dev, &config,
-			usb_strings, 3,
-			usbd_control_buffer, sizeof(usbd_control_buffer));
+        usb_port = usbd_init(&otgfs_usb_driver, &dev, &config,
+                usb_strings, 3,
+                usbd_control_buffer, sizeof(usbd_control_buffer));
 
-	usbd_register_set_config_callback(usb_port, cdcacm_set_config);
+        usbd_register_set_config_callback(usb_port, cdcacm_set_config);
+    }
+    usb_on = 1;
 }
 
 
 void usb_poll(void) {
-    usbd_poll(usb_port);
+    if (usb_on == 1)
+        usbd_poll(usb_port);
+}
+
+
+static void usb_puts(const char *str, size_t n) {
+
+    uint32_t deadline = mtime() + 10;
+
+    const size_t max_blocksize = 64;
+    if (usb_on == 1) {
+        while (n && ((int32_t)(mtime() - deadline) < 0)) {
+            size_t blocksize = n < max_blocksize ? n : max_blocksize;
+            if (usbd_ep_write_packet(usb_port, 0x82, str, n) == 0) {
+                str += blocksize;
+                n   -= blocksize;
+            }
+        }
+    }
+}
+
+
+void usb_putc(int c) {
+    char x = c;
+    usb_puts(&x, 1);
+}
+
+
+int usb_printf(const char *fmt, ...) {
+    char str[256];
+    int n_chars;
+    va_list args;
+    va_start (args, fmt);
+    n_chars = vsnprintf (str, sizeof(str), fmt, args);
+    va_end (args);
+
+    usb_puts(str, n_chars);
+
+    return n_chars;
 }

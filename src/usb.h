@@ -3,6 +3,10 @@
 
 
 #include <libopencm3/usb/usbd.h>
+#include <stdarg.h>
+
 void usb_setup(void);
 void usb_poll(void);
+void usb_putc(int i);
+int usb_printf(const char *fmt, ...);
 #endif // USB_H
