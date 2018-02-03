@@ -3,6 +3,7 @@
 #include "font.h"
 #include "lcd.h"
 #include "mc_telem.h"
+#include "usb.h"
 #include <libopencm3/stm32/can.h>
 #include <libopencm3/cm3/nvic.h>
 #include <libopencm3/stm32/rcc.h>
@@ -12,7 +13,7 @@ volatile can_stats_t can_stats;
 
 int can_rx_max_interval = 0;
 
-#define N_RX_SW_MAILBOX 6
+#define N_RX_SW_MAILBOX 10
 
 #define CAN_ID_SIC_L 0x12
 #define CAN_ID_SIC_R 0x11
@@ -20,10 +21,15 @@ int can_rx_max_interval = 0;
 #define ID_EMERG_L (0x80 | CAN_ID_SIC_L)
 #define ID_EMERG_R (0x80 | CAN_ID_SIC_R)
 // PDO addresses taken from Scott's SiCtroller code - though they seem off-by-one compared to what I read on the web
-#define ID_PDO1_L_RX ((5<<7) | CAN_ID_SIC_L)
-#define ID_PDO2_L_RX ((7<<7) | CAN_ID_SIC_L)
-#define ID_PDO1_R_RX ((5<<7) | CAN_ID_SIC_R)
-#define ID_PDO2_R_RX ((7<<7) | CAN_ID_SIC_R)
+#define ID_PDO1_L_RX ((5<<7)  | CAN_ID_SIC_L)
+#define ID_PDO2_L_RX ((7<<7)  | CAN_ID_SIC_L)
+#define ID_PDO3_L_RX ((9<<7)  | CAN_ID_SIC_L)
+#define ID_PDO4_L_RX ((11<<7) | CAN_ID_SIC_L)
+
+#define ID_PDO1_R_RX ((5<<7)  | CAN_ID_SIC_R)
+#define ID_PDO2_R_RX ((7<<7)  | CAN_ID_SIC_R)
+#define ID_PDO3_R_RX ((9<<7)  | CAN_ID_SIC_R)
+#define ID_PDO4_R_RX ((11<<7) | CAN_ID_SIC_R)
 
 enum {
   SW_MBX_EMERG_L,
@@ -32,6 +38,10 @@ enum {
   SW_MBX_PDO2_L,
   SW_MBX_PDO1_R,
   SW_MBX_PDO2_R,
+  SW_MBX_PDO3_L,
+  SW_MBX_PDO4_L,
+  SW_MBX_PDO3_R,
+  SW_MBX_PDO4_R,
   N_RX_SW_MBX};
 
 static can_sw_mbx_t can_sw_mbx[N_RX_SW_MAILBOX];
@@ -79,6 +89,11 @@ int can_setup(void) {
                                 ID_PDO2_R_RX << 5, ID_PDO1_R_RX << 5,
                                 1, true);
   
+  can_filter_id_list_16bit_init(CAN1, 2,
+                                ID_PDO4_L_RX << 5, ID_PDO3_L_RX << 5,
+                                ID_PDO4_R_RX << 5, ID_PDO3_R_RX << 5,
+                                1, true);
+
   can_enable_irq(CAN1, CAN_IER_FMPIE0);
   can_enable_irq(CAN1, CAN_IER_FMPIE1);
   return 0;
@@ -157,6 +172,16 @@ void can_process_rx(void) {
   // Called from the main loop to dispatch the various handlers
   for (int i = 0; i < N_RX_SW_MAILBOX; i++) {
     if (can_sw_mbx[i].full) {
+        if (usb_on == 1)
+            usb_printf("CAN: %02x %02x %02x %02x %02x %02x %02x %02x\n",
+                    can_sw_mbx[i].data[0],
+                    can_sw_mbx[i].data[1],
+                    can_sw_mbx[i].data[2],
+                    can_sw_mbx[i].data[3],
+                    can_sw_mbx[i].data[4],
+                    can_sw_mbx[i].data[5],
+                    can_sw_mbx[i].data[6],
+                    can_sw_mbx[i].data[7]);
       switch(i) {
       case SW_MBX_PDO1_L:
           crmi();
