@@ -4,6 +4,7 @@
 
 #include <libopencm3/usb/usbd.h>
 #include <stdarg.h>
+extern int usb_on;
 
 void usb_setup(void);
 void usb_poll(void);
