@@ -132,7 +132,6 @@ void board_setup(void) {
   spi_setup();
   lcd_setup();
   touch_setup();
-  usb_setup();
   int r = can_setup();
   if (r) {
     lcd_textbox_prep(0, 0, 480, 45, LCD_BLACK);
