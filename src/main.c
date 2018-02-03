@@ -9,6 +9,7 @@
 #include "ltc6804.h"
 #include "mc_telem.h"
 #include "touch.h"
+#include "usb.h"
 #include <libopencm3/cm3/systick.h>
 #include <libopencm3/stm32/can.h>
 #include <libopencm3/stm32/gpio.h>
@@ -224,6 +225,7 @@ int main(void)
         }
 
           can_process_rx();
+          usb_poll();
 //          can_hello_world();
           handle_sys();
           gui_update();

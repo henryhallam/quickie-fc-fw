@@ -9,6 +9,8 @@
 #include "lcd.h"
 #include "leds.h"
 #include "touch.h"
+#include "usb.h"
+
 
 /* All pins are allocated in this file, though they may be re-setup by peripheral drivers. 
    We'll also book-keep shared resources such as DMA below:
@@ -40,6 +42,9 @@ static void pins_setup(void)
   gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO7);      // LED1_G/R#
   gpio_set(GPIOA, GPIO8);
   gpio_mode_setup(GPIOA, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO8);  // FONA_PWRKEY
+  
+  gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9 | GPIO11 | GPIO12); // USB pins
+  gpio_set_af(GPIOA, GPIO_AF10, GPIO9 | GPIO11 | GPIO12);
 
   // Port B
   gpio_mode_setup(GPIOB, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO0);  // LCD_BACKLIGHT_PWM
@@ -118,6 +123,7 @@ static void dma_setup(void) {
   rcc_periph_clock_enable(RCC_DMA2);
 }
 
+
 void board_setup(void) {
   clock_setup();
   dma_setup();
@@ -126,6 +132,7 @@ void board_setup(void) {
   spi_setup();
   lcd_setup();
   touch_setup();
+  usb_setup();
   int r = can_setup();
   if (r) {
     lcd_textbox_prep(0, 0, 480, 45, LCD_BLACK);
