@@ -10,6 +10,7 @@
 #include "gui_bat.h"
 #include "gui_fun.h"
 #include "touch.h"
+#include "usb.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -211,13 +212,14 @@ static void gui_home_update(void) {
 }
 
 enum buttons_menu_e {
-  BUTT_MENU_HOME, BUTT_MENU_CAN, BUTT_MENU_TOUCH, BUTT_MENU_BATT, BUTT_MENU_REBOOT
+  BUTT_MENU_HOME, BUTT_MENU_CAN, BUTT_MENU_TOUCH, BUTT_MENU_BATT, BUTT_MENU_REBOOT, BUTT_MENU_USB
 };
 button_t buttons_menu[] = {[BUTT_MENU_HOME] = {0, 20, LCD_W / 2, 64, LCD_BLUE, "Home", 0, 0},
                            [BUTT_MENU_CAN] = {LCD_W/2, 20, LCD_W / 2, 64, LCD_GREY, "Debug CAN", 0, 0},
                            [BUTT_MENU_TOUCH] = {0, 84, LCD_W / 2, 64, LCD_MEDIUMGREEN, "Touch Cal / Debug", 0, 0},
                            [BUTT_MENU_BATT] = {LCD_W/2, 84, LCD_W / 2, 64, LCD_PURPLE, "Debug Batteries", 0, 0},
                            [BUTT_MENU_REBOOT] = {0, 148, LCD_W / 2, 64, LCD_RED, "Reboot", 0, 0},
+                           [BUTT_MENU_USB] =  {LCD_W/2, 148, LCD_W / 2, 64, LCD_GREEN, "USB bringup", 0, 0},
 };
 
 static void gui_menu_update(void) {
@@ -261,6 +263,8 @@ static void gui_menu_update(void) {
   }
   if (buttons_menu[BUTT_MENU_REBOOT].clicked)
     scb_reset_system();
+  if (buttons_menu[BUTT_MENU_USB].clicked)
+      usb_setup();
   if (debug_touch) {
     touch_show_debug();
     // Redraw menu every so often
