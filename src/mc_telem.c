@@ -18,3 +18,13 @@ void mc_telem_parse_pdo2(const uint8_t *data, mc_id_e mc_id) {
 
   mct->torque = mct->Iq;  // TODO: Actual torque
 }
+
+
+
+void mc_telem_parse_pdo3(const uint8_t *data, mc_id_e mc_id) {
+  mc_telem_t *mct = &mc_telem[mc_id];
+
+  mct->temp_motor = *(int16_t *)&data[6] * 0.1;  // Sent in deci-degC; not sure what happens when negative
+  mct->state      = data[4];
+  mct->cmd        = *(float *)&data[0];
+}

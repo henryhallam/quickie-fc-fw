@@ -58,6 +58,7 @@ extern mc_telem_t mc_telem[N_MCS];
 
 void mc_telem_parse_pdo1(const uint8_t *data, mc_id_e mc_id);
 void mc_telem_parse_pdo2(const uint8_t *data, mc_id_e mc_id);
+void mc_telem_parse_pdo3(const uint8_t *data, mc_id_e mc_id);
 
 
 #endif // MC_TELEM_H
