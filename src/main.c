@@ -103,6 +103,9 @@ static void handle_sys(void) {
     relay_ctl(RLY_FW_R,   0);
     relay_ctl(RLY_FW_L,   0);
 
+    relay_ctl(RLY_DIST_L,   0);
+    relay_ctl(RLY_FUEL_R,   0);
+
     if (bringup_button_pressed) {
       bringup_button_pressed = 0;
       advance(&bringup, SYS_PRECHARGE_LR, CLEAR);
@@ -113,6 +116,8 @@ static void handle_sys(void) {
     relay_ctl(RLY_PRECHG, 1);
     relay_ctl(RLY_FW_R,   0);
     relay_ctl(RLY_FW_L,   0);
+    relay_ctl(RLY_DIST_L,   0);
+    relay_ctl(RLY_FUEL_R,   0);
 
     if (mtime() - mc_telem[MC_RIGHT].mtime_rx < 100
         && mc_telem[MC_RIGHT].bus_v > BUS_VOLTAGE_GOOD
@@ -131,6 +136,8 @@ static void handle_sys(void) {
     relay_ctl(RLY_PRECHG, 1);
     relay_ctl(RLY_FW_R,   1);
     relay_ctl(RLY_FW_L,   1);
+    relay_ctl(RLY_DIST_L,   1);
+    relay_ctl(RLY_FUEL_R,   1);
 
     if (mtime() - bringup.mtime_last_transition > 50 // ensure main contactor has time to close
         && mtime() - mc_telem[MC_RIGHT].mtime_rx < 100  // recent data
@@ -153,6 +160,8 @@ static void handle_sys(void) {
     relay_ctl(RLY_PRECHG, 0);
     relay_ctl(RLY_FW_R,   1);
     relay_ctl(RLY_FW_L,   1);
+    relay_ctl(RLY_DIST_L,   1);
+    relay_ctl(RLY_FUEL_R,   1);
 
     if ( mtime() - mc_telem[MC_RIGHT].mtime_rx > 500        // lost comm
         || mc_telem[MC_RIGHT].bus_v < BUS_VOLTAGE_GOOD   // or low voltage
@@ -171,6 +180,8 @@ static void handle_sys(void) {
     relay_ctl(RLY_PRECHG, 0);
     relay_ctl(RLY_FW_R,   0);
     relay_ctl(RLY_FW_L,   0);
+    relay_ctl(RLY_DIST_L,   0);
+    relay_ctl(RLY_FUEL_R,   0);
 
     if (mtime() - bringup.mtime_last_transition > 1500) {
       advance(&bringup, SYS_OFF, PROPAGATE);
