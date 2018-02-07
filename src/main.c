@@ -17,12 +17,9 @@
 #include <string.h>
 
 
-#define BUS_VOLTAGE_GOOD (70.0)
+#define BUS_VOLTAGE_GOOD (300.0)
 
 struct bringup_ctx bringup;
-
-
-
 
 const char * bringup_error(const struct bringup_ctx *bup) {
     if (NORMAL == bup->fault) {
@@ -67,10 +64,6 @@ const char * bringup_ctx_string(const struct bringup_ctx *bup) {
             break;
     }
 }
-
-
-
-
 
 static void advance(struct bringup_ctx *ctx, enum bringup_stage new_stage, enum fault_action action) {
     switch (action) {
@@ -197,8 +190,6 @@ struct motor_command_t {
     uint16_t    PAD16;
     float       command_ref;
 };
-
-
 
 void can_torque_r(int enable, float torque) {
     struct motor_command_t foo;
