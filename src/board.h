@@ -21,11 +21,9 @@ enum bringup_stage { SYS_OFF, SYS_PRECHARGE_LR, SYS_MAIN_CLOSING, SYS_ON, SYS_CO
 enum fault_status { NORMAL, FAILED };
 enum fault_action { CLEAR, FAULT, PROPAGATE };
 
-
 extern int bringup_dirty, bringup_button_pressed;
 
 void raise_fault(void);
-
 
 extern struct bringup_ctx {
     enum bringup_stage  current_stage;
@@ -38,10 +36,5 @@ extern struct bringup_ctx {
 
 const char * bringup_error(const struct bringup_ctx *bup);
 const char * bringup_ctx_string(const struct bringup_ctx *bup);
-
-
-
-void can_torque_l(int enable, float torque);
-void can_torque_r(int enable, float torque);
 
 #endif //BOARD_H

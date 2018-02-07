@@ -15,9 +15,6 @@ int can_rx_max_interval = 0;
 
 #define N_RX_SW_MAILBOX 10
 
-#define CAN_ID_SIC_L 0x12
-#define CAN_ID_SIC_R 0x11
-
 #define ID_EMERG_L (0x80 | CAN_ID_SIC_L)
 #define ID_EMERG_R (0x80 | CAN_ID_SIC_R)
 // PDO addresses taken from Scott's SiCtroller code - though they seem off-by-one compared to what I read on the web
@@ -211,4 +208,10 @@ void can_process_rx(void) {
       can_sw_mbx[i].full = 0;
     }
   }
+}
+
+void can_tx(uint32_t id, uint8_t len, uint8_t *data) {
+  // Simple wrapper to send a CAN message
+  const bool ext = 0, rtr = 0;
+  can_transmit(CAN1, id, ext, rtr, len, data);
 }

@@ -1,14 +1,15 @@
-#include "gui.h"
 #include "board.h"
 #include "can.h"
 #include "clock.h"
-#include "lcd.h"
 #include "font.h"
-#include "gui_mc.h"
-#include "gui_main.h"
-#include "gui_msgs.h"
+#include "gui.h"
 #include "gui_bat.h"
+#include "gui_main.h"
+#include "gui_mc.h"
+#include "gui_msgs.h"
 #include "gui_fun.h"
+#include "lcd.h"
+#include "mc_telem.h"
 #include "touch.h"
 #include "usb.h"
 #include <stdint.h>
@@ -313,7 +314,8 @@ static void gui_rmc_update(void) {
 
         case 1:
             lcd_textbox_prep(0, 0, LCD_W, 20, LCD_BLACK);
-            lcd_printf(LCD_WHITE, &Roboto_Regular8pt7b, "T_right = %f, EN_right = %d T_left = %f, EN_left = %d", torque_r, enabled_r, torque_l, enabled_l);
+            lcd_printf(LCD_WHITE, &Roboto_Regular8pt7b, "T_right = %f, EN_right = %d T_left = %f, EN_left = %d",
+		       torque_r, enabled_r, torque_l, enabled_l);
             lcd_textbox_show();
             break;
     }
@@ -325,8 +327,8 @@ static void gui_rmc_update(void) {
         enabled_r = 0;
         torque_r = 0.0;
         torque_l = 0.0;
-        can_torque_r(enabled_r, torque_r);
-        can_torque_l(enabled_l, torque_l);
+	mc_cmd_torque(enabled_r, torque_r, MC_RIGHT);
+	mc_cmd_torque(enabled_l, torque_l, MC_LEFT);
         raise_fault();
     }
     if (buttons_rmc[BUTT_RMC_HOME].clicked) {
@@ -381,9 +383,8 @@ static void gui_rmc_update(void) {
     }
 
 
-    can_torque_r(enabled_r, torque_r);
-    can_torque_l(enabled_l, torque_l);
-
+    mc_cmd_torque(enabled_r, torque_r, MC_RIGHT);
+    mc_cmd_torque(enabled_l, torque_l, MC_LEFT);
 
 }
 

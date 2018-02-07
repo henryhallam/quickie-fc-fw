@@ -184,33 +184,6 @@ static void handle_sys(void) {
 
 }
 
-struct motor_command_t {
-    uint8_t     enable;
-    uint8_t     speedctrl;
-    uint16_t    PAD16;
-    float       command_ref;
-};
-
-void can_torque_r(int enable, float torque) {
-    struct motor_command_t foo;
-    foo.enable = enable;
-    foo.speedctrl = 0;
-    foo.PAD16 = 0xbeef;
-    foo.command_ref = torque;
-    can_transmit(CAN1, 0x211, 0, 0, 8, (uint8_t *) &foo);
-
-}
-
-void can_torque_l(int enable, float torque) {
-    struct motor_command_t foo;
-    foo.enable = enable;
-    foo.speedctrl = 0;
-    foo.PAD16 = 0xbeef;
-    foo.command_ref = torque;
-    can_transmit(CAN1, 0x212, 0, 0, 8, (uint8_t *) &foo);
-
-}
-
 int main(void)
 {
 	board_setup();
