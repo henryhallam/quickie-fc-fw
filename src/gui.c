@@ -175,8 +175,10 @@ static void gui_home_update(void) {
   case DRAW_BOTTOM:
     lcd_textbox_prep(0, LCD_H - 40 , LCD_W, 40, LCD_DARKGREY);
     lcd_printf(LCD_GREEN, &Roboto_Regular8pt7b,
-	       "CAN_ESR 0x%lx  V CRMI %d",
-	       CAN_ESR(CAN1), can_rx_max_interval);
+	       "LV bus: %.1f V  Backup: %.1f V",
+	       get_lv_bus_v(), get_9v_v());
+    /*	       "CAN_ESR 0x%lx  V CRMI %d",
+	       CAN_ESR(CAN1), can_rx_max_interval); */
 
     lcd_textbox_show();
     gui.page_state = DRAW_LEFT;
