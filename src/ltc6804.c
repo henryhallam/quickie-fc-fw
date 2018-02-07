@@ -15,8 +15,6 @@
 
 #define CHAIN_MAX 27
 
-#define V_TARGET 3.502
-
 // Command codes from datasheet Table 34
 #define WRCFG   0x001
 #define RDCFG   0x002
@@ -264,7 +262,7 @@ static void lightup_chain(uint8_t mask) {
 }
 */
 
-int ltc6804_get_voltages(int n_chain) {
+int ltc6804_get_voltages(int n_chain, float *voltages) {
   ltc6804_wakeup();
 
   ltc6804_chat(ADCV | AD_MD10 | CH_ALL, 0, n_chain, NULL);
@@ -275,6 +273,16 @@ int ltc6804_get_voltages(int n_chain) {
   ltc6804_chat(RDCVC, 0, n_chain, cv_regs[2]);
   ltc6804_chat(RDCVD, 0, n_chain, cv_regs[3]);
 
+
+  float v_sum = 0;
+  float v_min = INFINITY;
+  float v_max = 0;
+  
+  for (int i = 0; i < n_chain; i++)
+    for (int j = 0; j < 12; j++)
+      *voltages++ = cv_regs[j/3][i].reg16[j%3] * 100e-6;
+  
+    /*    
   float v_sum = 0;
   float v_min = INFINITY;
   float v_max = 0;
@@ -298,7 +306,7 @@ int ltc6804_get_voltages(int n_chain) {
     LOG_INFO("Sum = %.3f   Min, Mean, Max = %.3f, %.3f, %.3f",
            v_sum, v_min, v_sum/(12*n_chain), v_max);
 
-
+    */
   return 0;
 }
 
