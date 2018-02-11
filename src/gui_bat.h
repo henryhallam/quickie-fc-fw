@@ -24,7 +24,7 @@ typedef struct {
 
 int gui_bat_draw_frame(void);
 void gui_bat_draw_data(void);
-void debug_bat(void);
+void debug_bat(int page);
 
 void bat_calc_stats(int *hist_bins, const float *cell_vs, int n_cells, bat_stats_t *stats);
 

@@ -259,10 +259,12 @@ static void gui_menu_update(void) {
   }
   if (buttons_menu[BUTT_MENU_BATT].clicked) {
     lcd_clear();
-    while (!touch_get(NULL, NULL))
-      debug_bat();
+    for (int page = 0; page < 3; page++) {
+      while (!touch_get(NULL, NULL))
+	debug_bat(page);
+      while (touch_get(NULL, NULL));
+    }
     gui.page = GUI_HOME; gui.page_state = 0; lcd_clear();
-    while (touch_get(NULL, NULL));
   }
   if (buttons_menu[BUTT_MENU_REBOOT].clicked)
     scb_reset_system();

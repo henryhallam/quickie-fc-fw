@@ -150,39 +150,40 @@ void gui_bat_draw_data(void) {
   //  lcd_textbox_show();
 }
 
-void debug_bat() {
+void debug_bat(int page) {
 
   //  ltc6804_wakeup();
 
   int pec_fail = ltc6804_get_voltages(packs_talking, voltages) << 8;
   pec_fail |= ltc6804_get_temps(packs_talking, temperatures);
-  for (int i = 0; i < packs_talking; i++) {
-    lcd_textbox_prep(0, i*30, 480, 30, LCD_BLACK);
+  for (int i = 0; i < 9; i++) {
+    int j = page * 9 + i;
+    lcd_textbox_prep(0, i*32, 480, 32, LCD_BLACK);
     lcd_printf(LCD_WHITE, &DEBUG_FONT,
-	       "Pack %d: %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n",
-	       i,
-	       voltages[i*N_CELLS_PER_PACK + 0],
-	       voltages[i*N_CELLS_PER_PACK + 1],
-	       voltages[i*N_CELLS_PER_PACK + 2],
-	       voltages[i*N_CELLS_PER_PACK + 3],
-	       voltages[i*N_CELLS_PER_PACK + 4],
-	       voltages[i*N_CELLS_PER_PACK + 5],
-	       voltages[i*N_CELLS_PER_PACK + 6],
-	       voltages[i*N_CELLS_PER_PACK + 7],
-	       voltages[i*N_CELLS_PER_PACK + 8],
-	       voltages[i*N_CELLS_PER_PACK + 9],
-	       voltages[i*N_CELLS_PER_PACK + 10],
-	       voltages[i*N_CELLS_PER_PACK + 11]
+	       "Pack %2d: %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n",
+	       j,
+	       voltages[j*N_CELLS_PER_PACK + 0],
+	       voltages[j*N_CELLS_PER_PACK + 1],
+	       voltages[j*N_CELLS_PER_PACK + 2],
+	       voltages[j*N_CELLS_PER_PACK + 3],
+	       voltages[j*N_CELLS_PER_PACK + 4],
+	       voltages[j*N_CELLS_PER_PACK + 5],
+	       voltages[j*N_CELLS_PER_PACK + 6],
+	       voltages[j*N_CELLS_PER_PACK + 7],
+	       voltages[j*N_CELLS_PER_PACK + 8],
+	       voltages[j*N_CELLS_PER_PACK + 9],
+	       voltages[j*N_CELLS_PER_PACK + 10],
+	       voltages[j*N_CELLS_PER_PACK + 11]
 	       );
     
     lcd_printf(LCD_WHITE, &DEBUG_FONT,
-	       " Temps: %2d %2d %2d %2d %2d %2d  PEC 0x%04X",
-	       (int)temperatures[i*N_TEMPS_PER_PACK + 0],
-	       (int)temperatures[i*N_TEMPS_PER_PACK + 1],
-	       (int)temperatures[i*N_TEMPS_PER_PACK + 2],
-	       (int)temperatures[i*N_TEMPS_PER_PACK + 3],
-	       (int)temperatures[i*N_TEMPS_PER_PACK + 4],
-	       (int)temperatures[i*N_TEMPS_PER_PACK + 5],
+	       "  Temps: %2d %2d %2d %2d %2d %2d  PEC 0x%04X",
+	       (int)temperatures[j*N_TEMPS_PER_PACK + 0],
+	       (int)temperatures[j*N_TEMPS_PER_PACK + 1],
+	       (int)temperatures[j*N_TEMPS_PER_PACK + 2],
+	       (int)temperatures[j*N_TEMPS_PER_PACK + 3],
+	       (int)temperatures[j*N_TEMPS_PER_PACK + 4],
+	       (int)temperatures[j*N_TEMPS_PER_PACK + 5],
 	       pec_fail);
     lcd_textbox_show();
   }
