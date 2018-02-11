@@ -74,6 +74,10 @@
 #define LOG_INFO(fmt, ...) lcd_printf(LCD_WHITE, &RobotoCondensed_Regular7pt7b, fmt "\n", __VA_ARGS__)
 #define LOG_WARN(fmt, ...) lcd_printf(LCD_RED, &RobotoCondensed_Regular7pt7b, fmt "\n", __VA_ARGS__)
 
+enum ltc6804_msg_type_e {
+  LTC6804_CMD, LTC6804_READ, LTC6804_WRITE
+};
+
 typedef struct {
   union {
     uint8_t reg8[6];
@@ -191,17 +195,27 @@ static void spi_xfer_dma(uint16_t n, const uint8_t *tx_buf, uint8_t *rx_buf) {
 }
 
 
-static int ltc6804_chat(uint16_t cc, uint8_t is_write, uint8_t n_chain, reg_group_t *data) {
+static int ltc6804_chat(uint16_t cc, enum ltc6804_msg_type_e type, uint8_t n_chain, reg_group_t *data) {
   /* Static buffer NOT in CCM */
   static uint8_t dma_buffer[2+2+(6+2)*CHAIN_MAX] = {0};
-
 
   dma_buffer[0] = (cc & 0x0700) >> 8;
   dma_buffer[1] = cc & 0xFF;
   uint16_t pec = pec15(dma_buffer, 2);
   dma_buffer[2] = pec >> 8;
   dma_buffer[3] = pec & 0xFF;
-  if (is_write) {
+
+  if (type == LTC6804_CMD) {
+    // Broadcast command - no readback, can't fail
+    ASSERT_LTC6820_CS;
+    usleep(1);
+    spi_xfer_dma(4, dma_buffer, dma_buffer);
+    usleep(1);
+    RELEASE_LTC6820_CS;
+    return 0;
+  }
+  
+  if (type == LTC6804_WRITE) {
     for (int i = 0; i < n_chain; i++) {
       memcpy(&dma_buffer[4+i*(6+2)], &data[i].reg8, 6);
       pec = pec15(&dma_buffer[4+i*(6+2)], 6);
@@ -226,7 +240,7 @@ static int ltc6804_chat(uint16_t cc, uint8_t is_write, uint8_t n_chain, reg_grou
            dma_buffer[5], dma_buffer[6], dma_buffer[7], dma_buffer[8], dma_buffer[9]);
 #endif
   int pec_fail = 0;
-  if (!is_write) {
+  if (type != LTC6804_WRITE) {
     for (int i = 0; i < n_chain; i++) {
       if (data)
         memcpy(&data[i].reg8, &dma_buffer[4+i*(6+2)], 6);
@@ -265,24 +279,19 @@ static void lightup_chain(uint8_t mask) {
 int ltc6804_get_voltages(int n_chain, float *voltages) {
   ltc6804_wakeup();
 
-  ltc6804_chat(ADCV | AD_MD10 | CH_ALL, 0, n_chain, NULL);
+  int pec_fail = ltc6804_chat(ADCV | AD_MD10 | CH_ALL, LTC6804_CMD, n_chain, NULL) ? 1 : 0; // fail
   msleep(3);
   reg_group_t cv_regs[4][CHAIN_MAX];  // Each chain has 4 register groups, each with 3 16-bit values
-  ltc6804_chat(RDCVA, 0, n_chain, cv_regs[0]);
-  ltc6804_chat(RDCVB, 0, n_chain, cv_regs[1]);
-  ltc6804_chat(RDCVC, 0, n_chain, cv_regs[2]);
-  ltc6804_chat(RDCVD, 0, n_chain, cv_regs[3]);
+  pec_fail |= ltc6804_chat(RDCVA, LTC6804_READ, n_chain, cv_regs[0]) ? 2 : 0;
+  pec_fail |= ltc6804_chat(RDCVB, LTC6804_READ, n_chain, cv_regs[1]) ? 4 : 0;
+  pec_fail |= ltc6804_chat(RDCVC, LTC6804_READ, n_chain, cv_regs[2]) ? 8 : 0;  // fail
+  pec_fail |= ltc6804_chat(RDCVD, LTC6804_READ, n_chain, cv_regs[3]) ? 16 : 0;
 
-
-  float v_sum = 0;
-  float v_min = INFINITY;
-  float v_max = 0;
-  
   for (int i = 0; i < n_chain; i++)
     for (int j = 0; j < 12; j++)
       *voltages++ = cv_regs[j/3][i].reg16[j%3] * 100e-6;
   
-    /*    
+  /*    
   float v_sum = 0;
   float v_min = INFINITY;
   float v_max = 0;
@@ -306,22 +315,33 @@ int ltc6804_get_voltages(int n_chain, float *voltages) {
     LOG_INFO("Sum = %.3f   Min, Mean, Max = %.3f, %.3f, %.3f",
            v_sum, v_min, v_sum/(12*n_chain), v_max);
 
-    */
-  return 0;
+  */
+  return pec_fail;
 }
 
-int ltc6804_get_temps(int n_chain) {
-  ltc6804_chat(ADAX | AD_MD10 | CHG_ALL, 0, n_chain, NULL);
+int ltc6804_get_temps(int n_chain, float *temperatures) {
+  ltc6804_wakeup();
+  int pec_fail = ltc6804_chat(ADAX | AD_MD10 | CHG_ALL, LTC6804_CMD, n_chain, NULL);
   msleep(3);
   reg_group_t av_regs[3][CHAIN_MAX];  // Each chain has 4 register groups, each with 3 16-bit values
-  ltc6804_chat(RDAUXA, 0, n_chain, av_regs[0]);
-  ltc6804_chat(RDAUXB, 0, n_chain, av_regs[1]);
-  ltc6804_wakeup();
-  ltc6804_chat(ADSTAT | AD_MD10 | CHST_ITMP, 0, n_chain, NULL);
+  pec_fail |= ltc6804_chat(RDAUXA, LTC6804_READ, n_chain, av_regs[0]) ? 2 : 0;
+  pec_fail |= ltc6804_chat(RDAUXB, LTC6804_READ, n_chain, av_regs[1]) ? 4 : 0;
+  //  ltc6804_wakeup();
+  pec_fail |= ltc6804_chat(ADSTAT | AD_MD10 | CHST_ITMP, LTC6804_CMD, n_chain, NULL) ? 8 : 0;
   msleep(1);
-  ltc6804_wakeup();
-  ltc6804_chat(RDSTATA, 0, n_chain, av_regs[2]);
-
+  //ltc6804_wakeup();
+  pec_fail |= ltc6804_chat(RDSTATA, LTC6804_READ, n_chain, av_regs[2]) ? 16 : 0;
+  for (int i = 0; i < n_chain; i++) {
+    for (int j = 0; j < 5; j++) {
+      float v = av_regs[j/3][i].reg16[j%3] * 100e-6;
+      float r = 3.0*10e3 / v - 10e3;
+      float t = 1/(1/(273.0+25) + 1/3428.0 * logf(r/10e3)) - 273;
+      *temperatures++ = t;
+    }
+    float t = av_regs[2][i].reg16[1] * 100e-6 / 7.5e-3 - 273;
+    *temperatures++ = t;
+  }
+  /*
   for (int i = 0; i < n_chain; i++) {
     char s[222];
     char *p = s;
@@ -336,8 +356,8 @@ int ltc6804_get_temps(int n_chain) {
     p += sprintf(p, "%.1f", t);
     LOG_INFO("%s", s);
   }
-
-  return 0;
+  */
+  return pec_fail;
 }
 
 static void ltc6804_dischg(uint16_t mask, uint8_t led) {
@@ -347,7 +367,7 @@ static void ltc6804_dischg(uint16_t mask, uint8_t led) {
                 0, 0, 0, // Don't care about overvolt/undervolt flags
                 mask & 0x00FF,
       (mask & 0x0F00) >> 8}};
-  ltc6804_chat(WRCFG, 1, n_chain, &cfgr);
+  ltc6804_chat(WRCFG, LTC6804_WRITE, n_chain, &cfgr);
 }
 
 
@@ -358,7 +378,7 @@ int ltc6804_init(void) {
   // Probe to find out how many devices are in the chain
   ltc6804_wakeup();
   reg_group_t statb[CHAIN_MAX];
-  ltc6804_chat(RDSTATB, 0, CHAIN_MAX, statb);
+  ltc6804_chat(RDSTATB, LTC6804_READ, CHAIN_MAX, statb);
   int n_pec_ok = 0;
   for (int i = 0; i < CHAIN_MAX; i++) {
     n_pec_ok += statb[i].pec_ok;

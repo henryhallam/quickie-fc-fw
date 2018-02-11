@@ -18,6 +18,7 @@
 #define TITLE_H 14
 #define TITLE_FONT Roboto_Bold7pt7b
 #define DATA_FONT RobotoCondensed_Regular7pt7b
+#define DEBUG_FONT RobotoCondensed_Regular7pt7b
 #define TITLE_W 52 // (GUI_MC_W * 0.36)
 #define DATA_W 46 //(GUI_MC_W * 0.32)
 
@@ -38,6 +39,16 @@
 #define CELL_V_INFINITY 6.5536f // Larger than the largest value LTC6804 can return 
 
 int packs_talking = 0;
+
+#define N_BAT_STRINGS 3
+#define N_PACKS_PER_STRING 9
+#define N_CELLS_PER_PACK 12
+#define N_TEMPS_PER_PACK 6  // 5 external + 1 internal
+#define N_VOLTAGES (N_BAT_STRINGS * N_PACKS_PER_STRING * N_CELLS_PER_PACK)
+#define N_TEMPS (N_BAT_STRINGS * N_PACKS_PER_STRING * N_TEMPS_PER_PACK)
+
+static float voltages[N_VOLTAGES];
+static float temperatures[N_TEMPS];
 
 int gui_bat_draw_frame(void) {
   if (GUI_BAT_X < 0 || GUI_BAT_Y < 0 || GUI_BAT_X + GUI_BAT_W > LCD_W || GUI_BAT_Y + GUI_BAT_H > LCD_H)
@@ -118,11 +129,11 @@ void gui_bat_draw_data(void) {
   lcd_textbox_show();
   
   //  lcd_textbox_prep(0, LCD_H - 60, 480, 60, LCD_DARKGREY);
-  ltc6804_get_voltages(packs_talking);
+  ltc6804_get_voltages(packs_talking, voltages);
 
   static int hist[HIST_N_BINS];
   bat_stats_t stats;
-  bat_calc_stats(hist, fake_cell_vs, 324, &stats);
+  bat_calc_stats(hist, voltages, packs_talking * N_CELLS_PER_PACK, &stats);
   float v_bin_max = HIST_LO_BIN_V;
   for (int i = 0; i < HIST_N_BINS; i++) {
     float v_bin_min = v_bin_max;
@@ -139,17 +150,40 @@ void gui_bat_draw_data(void) {
   //  lcd_textbox_show();
 }
 
-
 void debug_bat() {
 
-  lcd_textbox_prep(0, 0, 480, 83, LCD_BLACK); 
-
   //  ltc6804_wakeup();
-  ltc6804_get_voltages(packs_talking);
-  lcd_textbox_show();
-  /*
-  ltc6804_chat(2, 0, 1, regs);
-  LOG_INFO("response = %02X %02X %02X %02X %02X %02X",
-           regs[0], regs[1], regs[2], regs[3], regs[4], regs[5]);
-  */
+
+  int pec_fail = ltc6804_get_voltages(packs_talking, voltages) << 8;
+  pec_fail |= ltc6804_get_temps(packs_talking, temperatures);
+  for (int i = 0; i < packs_talking; i++) {
+    lcd_textbox_prep(0, i*30, 480, 30, LCD_BLACK);
+    lcd_printf(LCD_WHITE, &DEBUG_FONT,
+	       "Pack %d: %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n",
+	       i,
+	       voltages[i*N_CELLS_PER_PACK + 0],
+	       voltages[i*N_CELLS_PER_PACK + 1],
+	       voltages[i*N_CELLS_PER_PACK + 2],
+	       voltages[i*N_CELLS_PER_PACK + 3],
+	       voltages[i*N_CELLS_PER_PACK + 4],
+	       voltages[i*N_CELLS_PER_PACK + 5],
+	       voltages[i*N_CELLS_PER_PACK + 6],
+	       voltages[i*N_CELLS_PER_PACK + 7],
+	       voltages[i*N_CELLS_PER_PACK + 8],
+	       voltages[i*N_CELLS_PER_PACK + 9],
+	       voltages[i*N_CELLS_PER_PACK + 10],
+	       voltages[i*N_CELLS_PER_PACK + 11]
+	       );
+    
+    lcd_printf(LCD_WHITE, &DEBUG_FONT,
+	       " Temps: %2d %2d %2d %2d %2d %2d  PEC 0x%04X",
+	       (int)temperatures[i*N_TEMPS_PER_PACK + 0],
+	       (int)temperatures[i*N_TEMPS_PER_PACK + 1],
+	       (int)temperatures[i*N_TEMPS_PER_PACK + 2],
+	       (int)temperatures[i*N_TEMPS_PER_PACK + 3],
+	       (int)temperatures[i*N_TEMPS_PER_PACK + 4],
+	       (int)temperatures[i*N_TEMPS_PER_PACK + 5],
+	       pec_fail);
+    lcd_textbox_show();
+  }
 }
