@@ -145,9 +145,9 @@ static const struct usb_config_descriptor config = {
 };
 
 static const char * usb_strings[] = {
-	"Black Sphere Technologies",
-	"CDC-ACM Demo",
-	"DEMO",
+	"Pericynthion Heavy Industries",
+	"Quick-E Flight Computer",
+	"0",
 };
 
 /* Buffer to be used for control requests. */
@@ -224,20 +224,21 @@ void usb_poll(void) {
 }
 
 
-static void usb_puts(const char *str, size_t n) {
+static int usb_puts(const char *str, size_t n) {
 
-    uint32_t deadline = mtime() + 10;
+    uint32_t deadline = mtime() + 20;
 
-    const size_t max_blocksize = 64;
+    const size_t max_blocksize = data_endp[1].wMaxPacketSize;
     if (usb_on == 1) {
-        while (n && ((int32_t)(mtime() - deadline) < 0)) {
-            size_t blocksize = n < max_blocksize ? n : max_blocksize;
-            if (usbd_ep_write_packet(usb_port, 0x82, str, n) == 0) {
-                str += blocksize;
-                n   -= blocksize;
-            }
-        }
+      while (n && ((int32_t)(mtime() - deadline) < 0)) {
+	size_t blocksize = (n < max_blocksize) ? n : max_blocksize;
+	if (usbd_ep_write_packet(usb_port, 0x82, str, blocksize) != 0) {
+	  str += blocksize;
+	  n   -= blocksize;
+	}
+      }
     }
+    return n;
 }
 
 
