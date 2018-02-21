@@ -11,6 +11,7 @@
 #include "lcd.h"
 #include "font.h"
 #include "ltc6804.h"
+#include "usb.h"
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
@@ -128,8 +129,35 @@ void gui_bat_draw_data(void) {
   lcd_printf(LCD_WHITE, &DATA_FONT, "%d packs", packs_talking);
   lcd_textbox_show();
   
-  //  lcd_textbox_prep(0, LCD_H - 60, 480, 60, LCD_DARKGREY);
   ltc6804_get_voltages(packs_talking, voltages);
+  ltc6804_get_temps(packs_talking, temperatures);
+  if (usb_on) {
+    for (int i = 0; i < packs_talking; i++) {
+      usb_printf("Pack %2d: %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f ",
+		 i,
+		 voltages[i*N_CELLS_PER_PACK + 0],
+		 voltages[i*N_CELLS_PER_PACK + 1],
+		 voltages[i*N_CELLS_PER_PACK + 2],
+		 voltages[i*N_CELLS_PER_PACK + 3],
+		 voltages[i*N_CELLS_PER_PACK + 4],
+		 voltages[i*N_CELLS_PER_PACK + 5],
+		 voltages[i*N_CELLS_PER_PACK + 6],
+		 voltages[i*N_CELLS_PER_PACK + 7],
+		 voltages[i*N_CELLS_PER_PACK + 8],
+		 voltages[i*N_CELLS_PER_PACK + 9],
+		 voltages[i*N_CELLS_PER_PACK + 10],
+		 voltages[i*N_CELLS_PER_PACK + 11]
+		 );
+
+      usb_printf("Temps: %2d %2d %2d %2d %2d %2d\n",
+		 (int)temperatures[i*N_TEMPS_PER_PACK + 0],
+		 (int)temperatures[i*N_TEMPS_PER_PACK + 1],
+		 (int)temperatures[i*N_TEMPS_PER_PACK + 2],
+		 (int)temperatures[i*N_TEMPS_PER_PACK + 3],
+		 (int)temperatures[i*N_TEMPS_PER_PACK + 4],
+		 (int)temperatures[i*N_TEMPS_PER_PACK + 5]);
+    }
+  }
 
   static int hist[HIST_N_BINS];
   bat_stats_t stats;
@@ -146,6 +174,11 @@ void gui_bat_draw_data(void) {
     lcd_fill_rect(GUI_BAT_X + 2, GUI_BAT_Y + GUI_BAT_H - TITLE_H - (1 + i), hist[i], 1, color);
     //    lcd_fill_rect(GUI_BAT_X + 2, GUI_BAT_Y + TITLE_H + 1 + i, hist[i], 1, LCD_DARKGREY);
   }
+  lcd_textbox_prep(GUI_BAT_X, GUI_BAT_Y + GUI_BAT_H - 70,
+		   GUI_BAT_W - TITLE_W, 70 - TITLE_H, LCD_DARKGREY);
+  lcd_printf(LCD_WHITE, &DATA_FONT, "Min=%.2fV\nMedian=%.2fV\nMax=%.2fV",
+	     stats.min, stats.median, stats.max);
+  lcd_textbox_show();
   
   //  lcd_textbox_show();
 }
