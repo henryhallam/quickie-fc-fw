@@ -103,12 +103,14 @@ void gui_main_draw_data(void) {
   lcd_textbox_move_cursor(GUI_MAIN_W - 68, 14, 0);
   lcd_printf(LCD_LIGHTGREY, &TORQUE_FONT, "%5.1f", mc_telem[MC_RIGHT].torque);
   lcd_textbox_show();
+  /*
   draw_bar(10, mc_telem[MC_LEFT].temp_SiC * TEMP_SCALE + TEMP_OFFSET, TEMP_BASE_COLOR);
   draw_bar(GUI_MAIN_W / 2 - 2 * BAR_W - 5, mc_telem[MC_LEFT].torque * TORQUE_SCALE + TORQUE_OFFSET, TORQUE_BASE_COLOR);
   draw_bar(GUI_MAIN_W / 2 - BAR_W, mc_telem[MC_LEFT].rpm * RPM_SCALE + RPM_OFFSET, RPM_BASE_COLOR);
   draw_bar(GUI_MAIN_W / 2, mc_telem[MC_RIGHT].rpm * RPM_SCALE + RPM_OFFSET, RPM_BASE_COLOR);
   draw_bar(GUI_MAIN_W / 2 + BAR_W + 5, mc_telem[MC_RIGHT].torque * TORQUE_SCALE + TORQUE_OFFSET, TORQUE_BASE_COLOR);
   draw_bar(GUI_MAIN_W - 10 - BAR_W, mc_telem[MC_RIGHT].temp_SiC * TEMP_SCALE + TEMP_OFFSET, TEMP_BASE_COLOR);
+  */
   lcd_textbox_prep(GUI_MAIN_X + 40, GUI_MAIN_Y + GUI_MAIN_H - 22, 90, 22, LCD_BLUE);
   lcd_printf(LCD_WHITE, &RPM_FONT, "%3.0f V", mc_telem[MC_RIGHT].bus_v);
   lcd_textbox_show();

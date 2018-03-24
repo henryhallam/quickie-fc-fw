@@ -225,9 +225,7 @@ void usb_poll(void) {
 
 
 static int usb_puts(const char *str, size_t n) {
-
     uint32_t deadline = mtime() + 20;
-
     const size_t max_blocksize = data_endp[1].wMaxPacketSize;
     if (usb_on == 1) {
       while (n && ((int32_t)(mtime() - deadline) < 0)) {

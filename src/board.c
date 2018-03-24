@@ -8,6 +8,8 @@
 #include "font.h"
 #include "lcd.h"
 #include "leds.h"
+#include "sdcard.h"
+#include "spi2_dma.h"
 #include "touch.h"
 #include "usb.h"
 
@@ -15,7 +17,8 @@
 /* All pins are allocated in this file, though they may be re-setup by peripheral drivers. 
    We'll also book-keep shared resources such as DMA below:
     - DMA1 stream 2: IsoSPI RX (ch0)
-    - DMA1 stream 4: LCD SPI TX (ch0)
+    - DMA1 stream 3: LCD/SD SPI RX (ch0)
+    - DMA1 stream 4: LCD/SD SPI TX (ch0)
     - DMA1 stream 5: IsoSPI TX (ch0)
     - DMA1 stream 6: DAC2 (ch7)  TODO
     - DMA2 stream 0: ADC1 (ch0)
@@ -71,7 +74,7 @@ static void pins_setup(void)
   // Port C
   gpio_mode_setup(GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO0);  // LCD_TOUCH_Y-
   gpio_set_af(GPIOC, GPIO_AF5, GPIO2);
-  gpio_mode_setup(GPIOC, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO2);      // LCD_MISO
+  gpio_mode_setup(GPIOC, GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO2);    // LCD_MISO
   gpio_set_af(GPIOC, GPIO_AF5, GPIO3);
   gpio_mode_setup(GPIOC, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO3);      // LCD_MOSI
   gpio_mode_setup(GPIOC, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO4);  // LCD_TOUCH_Y+
@@ -130,6 +133,7 @@ void board_setup(void) {
   pins_setup();
   leds_setup();
   spi_setup();
+  spi2_dma_setup();
   lcd_setup();
   touch_setup();
   int r = can_setup();
@@ -139,6 +143,13 @@ void board_setup(void) {
     lcd_textbox_show();
     msleep(1000);
   }
+  /*
+  int ret = sdcard_setup();
+  lcd_textbox_prep(0, 0 , LCD_W, 20, LCD_BLACK);
+  lcd_printf(LCD_WHITE, &Roboto_Regular8pt7b, "SD: 0x%02X", ret);
+  lcd_textbox_show();
+  msleep(2222);
+  */
 }
 
 void relay_ctl(relay_e relay, int state) {

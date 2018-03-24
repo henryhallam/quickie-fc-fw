@@ -276,46 +276,26 @@ static void lightup_chain(uint8_t mask) {
 }
 */
 
-int ltc6804_get_voltages(int n_chain, float *voltages) {
+uint32_t ltc6804_get_voltages(int n_chain, float *voltages) {
+  // Returns bit mask of packs with failed PECs, 0 if all are good
   ltc6804_wakeup();
+  uint32_t pec_fail = 0;
 
-  int pec_fail = ltc6804_chat(ADCV | AD_MD10 | CH_ALL, LTC6804_CMD, n_chain, NULL) ? 1 : 0; // fail
+  ltc6804_chat(ADCV | AD_MD10 | CH_ALL, LTC6804_CMD, n_chain, NULL);
   msleep(3);
   reg_group_t cv_regs[4][CHAIN_MAX];  // Each chain has 4 register groups, each with 3 16-bit values
-  pec_fail |= ltc6804_chat(RDCVA, LTC6804_READ, n_chain, cv_regs[0]) ? 2 : 0;
-  pec_fail |= ltc6804_chat(RDCVB, LTC6804_READ, n_chain, cv_regs[1]) ? 4 : 0;
-  pec_fail |= ltc6804_chat(RDCVC, LTC6804_READ, n_chain, cv_regs[2]) ? 8 : 0;  // fail
-  pec_fail |= ltc6804_chat(RDCVD, LTC6804_READ, n_chain, cv_regs[3]) ? 16 : 0;
+  ltc6804_chat(RDCVA, LTC6804_READ, n_chain, cv_regs[0]);
+  ltc6804_chat(RDCVB, LTC6804_READ, n_chain, cv_regs[1]);
+  ltc6804_chat(RDCVC, LTC6804_READ, n_chain, cv_regs[2]);
+  ltc6804_chat(RDCVD, LTC6804_READ, n_chain, cv_regs[3]);
 
-  for (int i = 0; i < n_chain; i++)
-    for (int j = 0; j < 12; j++)
-      *voltages++ = cv_regs[j/3][i].reg16[j%3] * 100e-6;
-  
-  /*    
-  float v_sum = 0;
-  float v_min = INFINITY;
-  float v_max = 0;
-  
   for (int i = 0; i < n_chain; i++) {
-    char s[222];
-    char *p = s;
-    p += sprintf(p, "Pack %d: ", i);
-    for (int j = 0; j < 12; j++) {
-      float v = cv_regs[j/3][i].reg16[j%3] * 100e-6;
-      v_sum += v;
-      if (v < v_min)
-        v_min = v;
-      if (v > v_max)
-        v_max = v;
-      p += sprintf(p, "%.3f ", v);
-
-    }
-    LOG_INFO("%s", s);
+    for (int j = 0; j < 12; j++)
+      *voltages++ = cv_regs[j / 3][i].reg16[j % 3] * 100e-6;
+    pec_fail |= (!(cv_regs[0][i].pec_ok && cv_regs[1][i].pec_ok &&
+		   cv_regs[2][i].pec_ok && cv_regs[3][i].pec_ok)) << i;
   }
-    LOG_INFO("Sum = %.3f   Min, Mean, Max = %.3f, %.3f, %.3f",
-           v_sum, v_min, v_sum/(12*n_chain), v_max);
-
-  */
+  
   return pec_fail;
 }
 

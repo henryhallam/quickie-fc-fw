@@ -124,14 +124,12 @@ void bat_calc_stats(int *hist_bins, const float *cell_vs, int n_cells, bat_stats
 }
 
 void gui_bat_draw_data(void) {
-  lcd_textbox_prep(GUI_BAT_X, GUI_BAT_Y + GUI_BAT_H - TITLE_H,
-		   GUI_BAT_W - TITLE_W, TITLE_H, LCD_DARKGREY);
-  lcd_printf(LCD_WHITE, &DATA_FONT, "%d packs", packs_talking);
-  lcd_textbox_show();
-  
-  ltc6804_get_voltages(packs_talking, voltages);
+  uint32_t pec_fail = ltc6804_get_voltages(packs_talking, voltages);
   ltc6804_get_temps(packs_talking, temperatures);
+  
   if (usb_on) {
+    usb_printf("PEC: %08X\n", pec_fail);
+    /*
     for (int i = 0; i < packs_talking; i++) {
       usb_printf("Pack %2d: %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f ",
 		 i,
@@ -157,6 +155,7 @@ void gui_bat_draw_data(void) {
 		 (int)temperatures[i*N_TEMPS_PER_PACK + 4],
 		 (int)temperatures[i*N_TEMPS_PER_PACK + 5]);
     }
+    */
   }
 
   static int hist[HIST_N_BINS];
@@ -174,10 +173,10 @@ void gui_bat_draw_data(void) {
     lcd_fill_rect(GUI_BAT_X + 2, GUI_BAT_Y + GUI_BAT_H - TITLE_H - (1 + i), hist[i], 1, color);
     //    lcd_fill_rect(GUI_BAT_X + 2, GUI_BAT_Y + TITLE_H + 1 + i, hist[i], 1, LCD_DARKGREY);
   }
-  lcd_textbox_prep(GUI_BAT_X, GUI_BAT_Y + GUI_BAT_H - 70,
-		   GUI_BAT_W - TITLE_W, 70 - TITLE_H, LCD_DARKGREY);
-  lcd_printf(LCD_WHITE, &DATA_FONT, "Min=%.2fV\nMedian=%.2fV\nMax=%.2fV",
-	     stats.min, stats.median, stats.max);
+  lcd_textbox_prep(GUI_BAT_X, GUI_BAT_Y + GUI_BAT_H - 75,
+		   GUI_BAT_W, 75, LCD_DARKGREY);
+  lcd_printf(LCD_WHITE, &DATA_FONT, "Min=%.2fV\nMedian=%.2fV\nMax=%.2fV\n%d packs detected\n%08X",
+	     stats.min, stats.median, stats.max, packs_talking, (unsigned int)pec_fail);
   lcd_textbox_show();
   
   //  lcd_textbox_show();
@@ -187,8 +186,8 @@ void debug_bat(int page) {
 
   //  ltc6804_wakeup();
 
-  int pec_fail = ltc6804_get_voltages(packs_talking, voltages) << 8;
-  pec_fail |= ltc6804_get_temps(packs_talking, temperatures);
+  uint32_t pec_fail = ltc6804_get_voltages(packs_talking, voltages) << 8;
+  ltc6804_get_temps(packs_talking, temperatures);
   for (int i = 0; i < 9; i++) {
     int j = page * 9 + i;
     lcd_textbox_prep(0, i*32, 480, 32, LCD_BLACK);
@@ -217,7 +216,7 @@ void debug_bat(int page) {
 	       (int)temperatures[j*N_TEMPS_PER_PACK + 3],
 	       (int)temperatures[j*N_TEMPS_PER_PACK + 4],
 	       (int)temperatures[j*N_TEMPS_PER_PACK + 5],
-	       pec_fail);
+	       (unsigned int)pec_fail);
     lcd_textbox_show();
   }
 }

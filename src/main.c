@@ -191,6 +191,15 @@ int main(void)
 
         gui_setup();
 	while (1) {
+
+        if (mtime() % 1000 < 500) {
+        led_set(LED_BATT_L,LED_RED);
+        led_set(LED_BATT_R,LED_GREEN);
+        } else {
+            led_set(LED_BATT_L, LED_GREEN);
+            led_set(LED_BATT_R, LED_YELLOW);
+        }
+
           can_process_rx();
           usb_poll();
           handle_sys();

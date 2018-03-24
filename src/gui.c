@@ -9,6 +9,7 @@
 #include "gui_msgs.h"
 #include "gui_fun.h"
 #include "lcd.h"
+#include "ltc6804.h"
 #include "mc_telem.h"
 #include "touch.h"
 #include "usb.h"
@@ -226,7 +227,7 @@ button_t buttons_menu[] = {[BUTT_MENU_HOME] = {0, 20, LCD_W / 2, 64, LCD_BLUE, "
 };
 
 static void gui_menu_update(void) {
-    msleep(10);
+  msleep(2);
   static bool debug_touch = 0;
   enum gui_menu_state { INIT = 0, WAIT = 1 };
   switch (gui.page_state) {
@@ -277,6 +278,13 @@ static void gui_menu_update(void) {
     if (redraw_ctr++ == 0)
       gui.page_state = INIT;
   }
+
+  if (usb_on) {
+    static float voltages[27*12];
+    uint32_t pec_fail = ltc6804_get_voltages(packs_talking, voltages);
+    usb_printf("PEC: %08X\n", pec_fail);
+  }
+  
 }
 
 enum buttons_rmc_e {
